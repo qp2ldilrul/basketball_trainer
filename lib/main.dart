@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
 void main() {
   runApp(const BasketballProApp());
@@ -26,20 +27,28 @@ class BasketballProApp extends StatelessWidget {
 class ShotRecord {
   final Offset position;
   final bool isMade;
+  final double angle; // 保留角度數據，供後續分析
   final String type;
   final Color color;
 
   ShotRecord({
     required this.position,
     required this.isMade,
+    required this.angle,
     required this.type,
     required this.color,
   });
 }
 
+// 修正後的類別結構
 class ShotProScreen extends StatefulWidget {
   const ShotProScreen({super.key});
 
+  @override
+  State<ShotProScreen> createState() => _ShotProScreenState();
+}
+
+class _ShotProScreenState extends State<ShotProScreen> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
@@ -71,11 +80,19 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
     '勾射': Colors.orangeAccent,
   };
 
-  void _handleTap(Offset pos) {
+  void _handleTap(Offset pos, Size size) {
+    // 角度運算邏輯：計算相對於最近籃框位置的角度
+    double targetX = pos.dx > size.width / 2 ? size.width * 0.92 : size.width * 0.08;
+    double targetY = size.height / 2;
+    double dx = pos.dx - targetX;
+    double dy = pos.dy - targetY;
+    double deg = (math.atan2(dy, dx) * 180 / math.pi).abs();
+
     setState(() {
       _records.add(ShotRecord(
         position: pos,
         isMade: _nextIsMade,
+        angle: deg,
         type: _currentType,
         color: _typeColors[_currentType]!,
       ));
@@ -100,6 +117,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
 
     return Column(
       children: [
+        // 頂部統計數據
         Container(
           padding: const EdgeInsets.symmetric(vertical: 20),
           color: const Color(0xFF252525),
@@ -113,21 +131,22 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
+        // 罰球與重設按鈕
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text('罰球：', style: TextStyle(color: Colors.orangeAccent, fontSize: 16)),
-              Text('投 $_ftTotal / 中 $_ftMade (${ftAcc.toStringAsFixed(1)}%)', style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 10),
-              IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => setState(() => _ftTotal++)),
-              IconButton(icon: const Icon(Icons.check_circle_outline), onPressed: () => setState(() { _ftTotal++; _ftMade++; })),
+              Text('投 $_ftTotal / 中 $_ftMade (${ftAcc.toStringAsFixed(1)}%)', style: const TextStyle(fontSize: 14)),
+              IconButton(icon: const Icon(Icons.add_circle_outline, size: 20), onPressed: () => setState(() => _ftTotal++)),
+              IconButton(icon: const Icon(Icons.check_circle_outline, size: 20), onPressed: () => setState(() { _ftTotal++; _ftMade++; })),
               const Spacer(),
               IconButton(icon: const Icon(Icons.refresh, color: Colors.redAccent), onPressed: () => setState(() { _records.clear(); _streak = 0; _ftTotal = 0; _ftMade = 0; })),
             ],
           ),
         ),
+        // 投籃類型選擇
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -143,6 +162,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             )).toList(),
           ),
         ),
+        // 進球切換按鈕
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 15),
           child: Row(
@@ -154,6 +174,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
+        // 簡約球場繪製區
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -168,7 +189,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     return GestureDetector(
-                      onTapDown: (d) => _handleTap(d.localPosition),
+                      onTapDown: (d) => _handleTap(d.localPosition, Size(constraints.maxWidth, constraints.maxHeight)),
                       child: CustomPaint(
                         size: Size.infinite,
                         painter: SimpleCourtPainter(records: _records),
@@ -186,8 +207,8 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
 
   Widget _statBox(String label, String val, Color c) {
     return Column(children: [
-      Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      Text(val, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: c)),
+      Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+      Text(val, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: c)),
     ]);
   }
 
@@ -216,15 +237,15 @@ class SimpleCourtPainter extends CustomPainter {
     double midX = size.width / 2;
     double midY = size.height / 2;
 
-    // 畫中線與禁區線條
+    // 繪製球場基本線條
     canvas.drawLine(Offset(midX, 0), Offset(midX, size.height), linePaint);
     canvas.drawCircle(Offset(midX, midY), 50, linePaint);
     
-    // 左右兩邊中線位置的大黑點
+    // 依要求：在左右兩側中線位置放上實心大黑點
     canvas.drawCircle(Offset(size.width * 0.08, midY), 12, dotPaint);
     canvas.drawCircle(Offset(size.width * 0.92, midY), 12, dotPaint);
 
-    // 畫投籃點
+    // 繪製投籃點 (移除所有角度與位置文字標示)
     for (var r in records) {
       final pPaint = Paint()..color = r.color;
       if (r.isMade) {
