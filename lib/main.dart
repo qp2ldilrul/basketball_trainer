@@ -68,7 +68,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
     double dx = localPosition.dx - cx;
     double dy = localPosition.dy - basketY;
     
-    // 計算角度 (0-180度)
     double radians = math.atan2(dy, dx);
     double degrees = radians * 180 / math.pi;
     if (degrees < 0) degrees = 0;
@@ -137,7 +136,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
       ),
       body: Column(
         children: [
-          // 數據看板
           Container(
             padding: const EdgeInsets.symmetric(vertical: 20),
             decoration: const BoxDecoration(
@@ -154,8 +152,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
               ],
             ),
           ),
-
-          // 操作區
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -196,8 +192,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
               ],
             ),
           ),
-
-          // 球場紀錄區
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -214,7 +208,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
                       onTapDown: (details) => handleTap(details.localPosition, Size(constraints.maxWidth, constraints.maxHeight)),
                       child: CustomPaint(
                         size: Size.infinite,
-                        painter: AnalyticsPainter(records: shotRecords),
+                        painter: AnalyticsPainter(records: List.from(shotRecords)),
                       ),
                     ),
                   ),
@@ -246,7 +240,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
         decoration: BoxDecoration(
           color: selected ? Colors.white.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? Colors.white : Colors.white24),
+          border: Border.all(color: selected ? Colors.white : Colors.white24, width: 2),
         ),
         child: Text(text, style: TextStyle(color: selected ? Colors.white : Colors.white38, fontWeight: FontWeight.bold)),
       ),
@@ -268,15 +262,15 @@ class AnalyticsPainter extends CustomPainter {
     double cx = size.width / 2;
     double top = 30.0;
 
-    // 繪製基礎球場
+    // 繪製球場背景線
     canvas.drawLine(Offset(0, top), Offset(size.width, top), linePaint);
     canvas.drawRect(Rect.fromLTWH(cx - size.width * 0.16, top, size.width * 0.32, size.height * 0.35), linePaint);
     canvas.drawCircle(Offset(cx, top + 15), 15, linePaint);
     canvas.drawArc(Rect.fromCircle(center: Offset(cx, top + 15), radius: size.width * 0.42), 0, math.pi, false, linePaint);
 
-    // 繪製點位與數據標籤
+    // 繪製每一個紀錄點及其標籤
     for (var r in records) {
-      final shotColor = r.color;
+      final Color shotColor = r.color;
       
       // 1. 繪製點位
       if (r.isMade) {
@@ -284,29 +278,41 @@ class AnalyticsPainter extends CustomPainter {
         canvas.drawCircle(r.position, 10, Paint()..color = shotColor.withOpacity(0.2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
       } else {
         canvas.drawCircle(r.position, 6, Paint()..color = shotColor..style = PaintingStyle.stroke..strokeWidth = 2);
-        canvas.drawLine(Offset(r.position.dx-3, r.position.dy-3), Offset(r.position.dx+3, r.position.dy+3), Paint()..color = shotColor);
-        canvas.drawLine(Offset(r.position.dx+3, r.position.dy-3), Offset(r.position.dx-3, r.position.dy+3), Paint()..color = shotColor);
+        final p = r.position;
+        canvas.drawLine(Offset(p.dx-3, p.dy-3), Offset(p.dx+3, p.dy+3), Paint()..color = shotColor..strokeWidth = 1.5);
+        canvas.drawLine(Offset(p.dx+3, p.dy-3), Offset(p.dx-3, p.dy+3), Paint()..color = shotColor..strokeWidth = 1.5);
       }
 
-      // 2. 繪製數據標籤 (文字如: 定65°)
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: '${r.type[0]}${r.angle.toInt()}°', // 取動作的第一個字 + 角度
-          style: TextStyle(
-            color: shotColor.withOpacity(0.9),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'monospace',
-          ),
+      // 2. 關鍵修正：繪製文字標籤 (如：定65°)
+      // 使用 TextPainter 確保文字能被正確渲染在 CustomPaint 上
+      final textSpan = TextSpan(
+        text: '${r.type[0]}${r.angle.toInt()}°',
+        style: TextStyle(
+          color: shotColor,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          // 加上深色發光效果，確保在深背景下清晰
+          shadows: const [
+            Shadow(blurRadius: 4.0, color: Colors.black, offset: Offset(1.0, 1.0)),
+          ],
         ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+      );
 
-      // 文字顯示在點位的右上方
-      textPainter.paint(canvas, Offset(r.position.dx + 8, r.position.dy - 12));
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      );
+
+      textPainter.layout();
+      
+      // 將文字繪製在點位右上方稍微偏移一點的位置
+      textPainter.paint(canvas, Offset(r.position.dx + 8, r.position.dy - 16));
     }
   }
 
   @override
-  bool shouldRepaint(CustomPainter old) => true;
+  bool shouldRepaint(covariant AnalyticsPainter oldDelegate) {
+    // 每次紀錄點數量不同時，強迫重繪
+    return oldDelegate.records.length != records.length;
+  }
 }
