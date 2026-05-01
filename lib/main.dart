@@ -57,7 +57,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
 }
 
 class ShotTrackerBody extends StatefulWidget {
-  const ShotTrackerBody({super.key});
+  const ShotTrackerBody({super.head});
 
   @override
   State<ShotTrackerBody> createState() => _ShotTrackerBodyState();
@@ -81,7 +81,6 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
   };
 
   void _handleTap(Offset pos, Size size) {
-    // 依妳之前的邏輯：計算相對於最近大黑點（籃框位置）的角度
     double targetX = pos.dx > size.width / 2 ? size.width * 0.92 : size.width * 0.08;
     double targetY = size.height / 2;
     double dx = pos.dx - targetX;
@@ -125,13 +124,10 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
     int made = _records.where((r) => r.isMade).length;
     double acc = total == 0 ? 0 : (made / total) * 100;
     double ftAcc = _ftTotal == 0 ? 0 : (_ftMade / _ftTotal) * 100;
-    
-    // 1. 日期顯示
     String today = "${DateTime.now().year} / ${DateTime.now().month.toString().padLeft(2, '0')} / ${DateTime.now().day.toString().padLeft(2, '0')}";
 
     return Column(
       children: [
-        // 頂部標題與返回鍵
         Container(
           width: double.infinity,
           padding: const EdgeInsets.only(top: 10),
@@ -141,10 +137,9 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // 2. 回上一步按鈕
                   IconButton(icon: const Icon(Icons.undo, color: Colors.white), onPressed: _undo),
                   const Text('BASKETBALL TRAINER PRO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(width: 48), 
+                  const SizedBox(width: 48),
                 ],
               ),
               Text(today, style: const TextStyle(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w500)),
@@ -152,7 +147,6 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
-        // 統計數據
         Container(
           padding: const EdgeInsets.symmetric(vertical: 15),
           color: const Color(0xFF252525),
@@ -166,7 +160,6 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
-        // 罰球控制區
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
           child: Row(
@@ -181,7 +174,6 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
-        // 3. 類型與角度顯示 (角度會在這裡出現)
         const SizedBox(height: 5),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -204,7 +196,6 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             child: Text('最後投籃角度: ${_lastAngle.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.yellowAccent, fontSize: 14, fontWeight: FontWeight.bold)),
           ),
         ),
-        // 進球狀態切換
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -213,7 +204,6 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             _goalBtn(false, 'OUT', Colors.red),
           ],
         ),
-        // 4. 球場繪製區 (完整線條)
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -284,17 +274,13 @@ class FullCourtPainter extends CustomPainter {
     double midX = w / 2;
     double midY = h / 2;
 
-    // --- 完整球場線條繪製 ---
-    // 中線與中圈
     canvas.drawLine(Offset(midX, 0), Offset(midX, h), linePaint);
     canvas.drawCircle(Offset(midX, midY), h * 0.18, linePaint);
 
-    // 繪製左右半場
     for (bool isLeft in [true, false]) {
       double sideMul = isLeft ? 1 : -1;
       double startX = isLeft ? 0 : w;
 
-      // 禁區 (The Key)
       double keyW = w * 0.18;
       double keyH = h * 0.38;
       canvas.drawRect(
@@ -306,7 +292,6 @@ class FullCourtPainter extends CustomPainter {
         linePaint,
       );
 
-      // 罰球弧
       canvas.drawArc(
         Rect.fromCenter(
           center: Offset(startX + (sideMul * keyW), midY),
@@ -319,15 +304,11 @@ class FullCourtPainter extends CustomPainter {
         linePaint,
       );
 
-      // 三分線 (弧線 + 兩側底角直線)
       double threeR = h * 0.42;
       double straightW = w * 0.05;
-      
-      // 底角直線
       canvas.drawLine(Offset(startX, midY - threeR), Offset(startX + (sideMul * straightW), midY - threeR), linePaint);
       canvas.drawLine(Offset(startX, midY + threeR), Offset(startX + (sideMul * straightW), midY + threeR), linePaint);
       
-      // 三分弧
       canvas.drawArc(
         Rect.fromCenter(
           center: Offset(startX + (sideMul * straightW), midY),
@@ -341,18 +322,15 @@ class FullCourtPainter extends CustomPainter {
       );
     }
 
-    // 依要求：左右兩側中線位置的實心大黑點
     canvas.drawCircle(Offset(w * 0.08, midY), 12, dotPaint);
     canvas.drawCircle(Offset(w * 0.92, midY), 12, dotPaint);
 
-    // --- 繪製投籃標記 ---
     for (var r in records) {
       final pPaint = Paint()..color = r.color..strokeCap = StrokeCap.round;
       if (r.isMade) {
         canvas.drawCircle(r.position, 8, pPaint);
       } else {
         canvas.drawCircle(r.position, 8, pPaint..style = PaintingStyle.stroke..strokeWidth = 3);
-        // 畫 X
         canvas.drawLine(Offset(r.position.dx-5, r.position.dy-5), Offset(r.position.dx+5, r.position.dy+5), pPaint);
         canvas.drawLine(Offset(r.position.dx+5, r.position.dy-5), Offset(r.position.dx-5, r.position.dy+5), pPaint);
       }
