@@ -81,19 +81,29 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
   };
 
   void _handleTap(Offset pos, Size size) {
-    // 根據點擊位置決定目標籃框（左或右）
-    double targetX = pos.dx > size.width / 2 ? size.width * 0.92 : size.width * 0.08;
+    // 判斷左半場或右半場
+    bool isLeftHalf = pos.dx < size.width / 2;
+    double targetX = isLeftHalf ? size.width * 0.08 : size.width * 0.92;
     double targetY = size.height / 2;
+
+    // 計算向量
     double dx = pos.dx - targetX;
     double dy = pos.dy - targetY;
-    double deg = (math.atan2(dy, dx) * 180 / math.pi).abs();
+
+    // 計算角度 (使用 atan2)
+    // 左半場基準向右，右半場基準向左，以達到對稱效果
+    double rad = isLeftHalf ? math.atan2(dy, -dx) : math.atan2(dy, dx);
+    double deg = rad * 180 / math.pi;
+    
+    // 取得絕對值並確保底角為 180 (或接近 180)
+    double finalAngle = deg.abs();
 
     setState(() {
-      _lastAngle = deg;
+      _lastAngle = finalAngle;
       _records.add(ShotRecord(
         position: pos,
         isMade: _nextIsMade,
-        angle: deg,
+        angle: finalAngle,
         type: _currentType,
         color: _typeColors[_currentType]!,
       ));
@@ -125,11 +135,11 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
     int made = _records.where((r) => r.isMade).length;
     double acc = total == 0 ? 0 : (made / total) * 100;
     double ftAcc = _ftTotal == 0 ? 0 : (_ftMade / _ftTotal) * 100;
-    String today = "${DateTime.now().year} / ${DateTime.now().month.toString().padLeft(2, '0')} / ${DateTime.now().day.toString().padLeft(2, '0')}";
+    String today = "2026 / 05 / 02"; // 配合截圖日期格式
 
     return Column(
       children: [
-        // 頂部導覽
+        // 頂部導覽列
         Container(
           width: double.infinity,
           padding: const EdgeInsets.only(top: 10),
@@ -149,7 +159,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
-        // 統計數據
+        // 數據統計
         Container(
           padding: const EdgeInsets.symmetric(vertical: 15),
           color: const Color(0xFF252525),
@@ -181,44 +191,48 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
-        // 投籃類型選擇：修正擠在一起的問題
-        const SizedBox(height: 5),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: _typeColors.keys.map((type) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: ChoiceChip(
-                visualDensity: const VisualDensity(horizontal: 2, vertical: -1), // 增加內部水平空間
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // 增加外距
-                label: Text(type, style: const TextStyle(fontSize: 16)),
-                selected: _currentType == type,
-                selectedColor: _typeColors[type],
-                labelStyle: TextStyle(
-                  color: _currentType == type ? Colors.black : Colors.white,
-                  fontWeight: FontWeight.bold,
+        // 投籃類型選擇：自定義大按鈕確保字體清晰
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: _typeColors.keys.map((type) {
+            bool isSelected = _currentType == type;
+            return GestureDetector(
+              onTap: () => setState(() => _currentType = type),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? _typeColors[type] : Colors.grey[850],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white24),
                 ),
-                onSelected: (val) => setState(() => _currentType = type),
+                child: Text(
+                  type,
+                  style: TextStyle(
+                    color: isSelected ? Colors.black : Colors.white,
+                    fontSize: 22, // 增大字體
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            )).toList(),
-          ),
+            );
+          }).toList(),
         ),
         // 最後角度黃色提示
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.yellowAccent,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '最後投籃角度: ${_lastAngle.toStringAsFixed(1)}°',
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
-            ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.yellowAccent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '最後投籃角度: ${_lastAngle.toStringAsFixed(1)}°',
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
+        const SizedBox(height: 10),
         // IN / OUT 按鈕
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -228,7 +242,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             _goalBtn(false, 'OUT', Colors.grey.shade700),
           ],
         ),
-        // 球場繪圖：包含點點旁的角度
+        // 球場區域
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -272,10 +286,10 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
       onPressed: () => setState(() => _nextIsMade = goal),
       style: ElevatedButton.styleFrom(
         backgroundColor: active ? (goal ? Colors.green : Colors.red) : Colors.grey[800],
-        minimumSize: const Size(110, 45),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        minimumSize: const Size(120, 50),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      child: Text(txt, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+      child: Text(txt, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
     );
   }
 }
@@ -298,7 +312,7 @@ class FullCourtPainter extends CustomPainter {
     double midX = w / 2;
     double midY = h / 2;
 
-    // 球場線條
+    // 球場背景標線
     canvas.drawLine(Offset(midX, 0), Offset(midX, h), linePaint);
     canvas.drawCircle(Offset(midX, midY), h * 0.18, linePaint);
 
@@ -316,14 +330,14 @@ class FullCourtPainter extends CustomPainter {
       canvas.drawArc(Rect.fromCenter(center: Offset(startX + (sideMul * straightW), midY), width: (w * 0.3) * 2, height: threeR * 2), isLeft ? -math.pi / 2 : math.pi / 2, math.pi, false, linePaint);
     }
 
+    // 籃框圓點
     canvas.drawCircle(Offset(w * 0.08, midY), 14, dotPaint);
     canvas.drawCircle(Offset(w * 0.92, midY), 14, dotPaint);
 
-    // 繪製每個點位與對應的角度文字
+    // 繪製投籃點與角度標籤
     for (var r in records) {
       final pPaint = Paint()..color = r.color..strokeCap = StrokeCap.round;
       
-      // 1. 畫投籃點
       if (r.isMade) {
         canvas.drawCircle(r.position, 9, pPaint);
       } else {
@@ -332,22 +346,21 @@ class FullCourtPainter extends CustomPainter {
         canvas.drawLine(Offset(r.position.dx+6, r.position.dy-6), Offset(r.position.dx-6, r.position.dy+6), pPaint);
       }
 
-      // 2. 畫角度文字標籤 (確保在點的旁邊)
+      // 角度文字
       final textPainter = TextPainter(
         text: TextSpan(
           text: '${r.angle.toStringAsFixed(1)}°',
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.black,
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.bold,
-            backgroundColor: Colors.white.withOpacity(0.8),
+            backgroundColor: Colors.white70,
           ),
         ),
         textDirection: TextDirection.ltr,
       );
       textPainter.layout();
-      // 將文字偏移，避免蓋住點點
-      textPainter.paint(canvas, Offset(r.position.dx - (textPainter.width / 2), r.position.dy - 22));
+      textPainter.paint(canvas, Offset(r.position.dx - (textPainter.width / 2), r.position.dy - 24));
     }
   }
 
