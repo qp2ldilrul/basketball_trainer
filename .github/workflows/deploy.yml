@@ -10,8 +10,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          # 不指定版本，讓它自動抓取最新穩定版以避免工具鏈衝突
-      - run: flutter build web --release --base-href /basket_trainer/
+      - run: |
+          flutter config --enable-web
+          flutter build web --release --base-href /basket_trainer/
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
