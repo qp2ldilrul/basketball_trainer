@@ -15,7 +15,7 @@ class BasketballProApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primarySwatch: Colors.orange,
+        primaryColor: const Color(0xFFFF9800),
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFF1A1A1A),
       ),
@@ -66,23 +66,21 @@ class _ShotProScreenState extends State<ShotProScreen> {
 
   void _handleTap(Offset pos, Size size) {
     bool isLeftHalf = pos.dx < size.width / 2;
-    // 籃框圓心位置
+    // 籃框中心座標
     double basketX = isLeftHalf ? size.width * 0.08 : size.width * 0.92;
     double basketY = size.height / 2;
 
-    double dx = pos.dx - basketX;
-    double dy = pos.dy - basketY;
+    // 計算相對於籃框的位移
+    // dx: 往場內的距離 (正數)
+    // dy: 偏離中心線的距離 (正數)
+    double dx = isLeftHalf ? (pos.dx - basketX) : (basketX - pos.dx);
+    double dy = (pos.dy - basketY).abs();
 
-    // 角度邏輯：
-    // 使用 atan2 獲取弧度。dy 是垂直距離，dx 是水平距離。
-    // 在左半場，dx 為正表示往場內走；在右半場，-dx 為正表示往場內走。
-    double rad = isLeftHalf ? math.atan2(dy.abs(), dx) : math.atan2(dy.abs(), -dx);
+    // 角度計算：
+    // 使用 atan2(垂直位移, 水平位移) 得到與中心水平線的夾角 (0~90度)
+    // 加上 90 度，使得正對面(dy=0)是 90度，底角(dx趨近0)是 180度
+    double rad = math.atan2(dy, dx);
     double deg = rad * 180 / math.pi;
-    
-    // 轉換邏輯：
-    // 當站在籃框正對面時 (dx很大, dy趨近0)，rad趨近0，我們希望顯示 90。
-    // 當站在底角時 (dx趨近0, dy很大)，rad趨近 pi/2 (90度)，我們希望顯示 180。
-    // 因此最終角度 = 90 + deg
     double finalAngle = 90 + deg;
 
     setState(() {
@@ -94,251 +92,336 @@ class _ShotProScreenState extends State<ShotProScreen> {
         type: _currentType,
         color: _typeColors[_currentType]!,
       ));
-      _updateStreak();
+      
+      // 更新連進次數
+      int currentStreak = 0;
+      for (int i = _records.length - 1; i >= 0; i--) {
+        if (_records[i].isMade) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+      _streak = currentStreak;
     });
-  }
-
-  void _updateStreak() {
-    int s = 0;
-    for (int i = _records.length - 1; i >= 0; i--) {
-      if (_records[i].isMade) s++; else break;
-    }
-    _streak = s;
   }
 
   void _undo() {
     if (_records.isNotEmpty) {
       setState(() {
         _records.removeLast();
-        _updateStreak();
+        // 重新計算 Streak
+        int currentStreak = 0;
+        for (int i = _records.length - 1; i >= 0; i--) {
+          if (_records[i].isMade) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+        _streak = currentStreak;
         _lastAngle = _records.isEmpty ? 0.0 : _records.last.angle;
       });
     }
   }
 
+  void _resetAll() {
+    setState(() {
+      _records.clear();
+      _ftTotal = 0;
+      _ftMade = 0;
+      _streak = 0;
+      _lastAngle = 0.0;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    int total = _records.length;
-    int made = _records.where((r) => r.isMade).length;
-    double acc = total == 0 ? 0 : (made / total) * 100;
-    double ftAcc = _ftTotal == 0 ? 0 : (_ftMade / _ftTotal) * 100;
-    String today = "2026 / 05 / 02";
+    int totalCount = _records.length;
+    int madeCount = _records.where((r) => r.isMade).length;
+    double accuracy = totalCount == 0 ? 0.0 : (madeCount / totalCount) * 100;
+    double ftAccuracy = _ftTotal == 0 ? 0.0 : (_ftMade / _ftTotal) * 100;
 
     return Scaffold(
-      body: Column(
-        children: [
-          // 1. 頂部狀態列
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.only(top: 10),
-            color: const Color(0xFF252525),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(icon: const Icon(Icons.undo, color: Colors.white), onPressed: _undo),
-                    const Text('BASKETBALL TRAINER PRO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-                Text(today, style: const TextStyle(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 10),
-              ],
-            ),
-          ),
-          // 2. 數據面板
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            color: const Color(0xFF252525),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _statBox('SHOTS', total.toString(), Colors.white),
-                _statBox('MADE', made.toString(), Colors.orangeAccent),
-                _statBox('ACC%', '${acc.toStringAsFixed(1)}%', Colors.cyanAccent),
-                _statBox('STREAK', _streak.toString(), Colors.yellowAccent),
-              ],
-            ),
-          ),
-          // 3. 罰球控制區
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
-            child: Row(
-              children: [
-                Text('罰球 : 投 $_ftTotal / 中 $_ftMade (${ftAcc.toStringAsFixed(1)}%)', style: const TextStyle(color: Colors.orange, fontSize: 14)),
-                const SizedBox(width: 10),
-                GestureDetector(onTap: () => setState(() => _ftTotal++), child: const Icon(Icons.add_circle_outline, size: 22, color: Colors.white)),
-                const SizedBox(width: 10),
-                GestureDetector(onTap: () => setState(() { _ftTotal++; _ftMade++; }), child: const Icon(Icons.check_circle_outline, size: 22, color: Colors.white)),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => setState(() { _records.clear(); _ftTotal = 0; _ftMade = 0; _streak = 0; _lastAngle = 0; }),
-                  child: const Icon(Icons.refresh, color: Colors.redAccent, size: 26),
-                ),
-              ],
-            ),
-          ),
-          // 4. 投籃類型選擇（修正字體與擠壓問題）
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: _typeColors.keys.map((type) {
-                bool isSelected = _currentType == type;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _currentType = type),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isSelected ? _typeColors[type] : Colors.grey[850],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: isSelected ? Colors.white : Colors.white10),
+      body: Container(
+        decoration: const BoxDecoration(color: Color(0xFF1A1A1A)),
+        child: Column(
+          children: [
+            // --- 頂部標題與復原鍵 ---
+            Container(
+              padding: const EdgeInsets.only(top: 15, bottom: 5),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      icon: const Icon(Icons.undo, color: Colors.white, size: 28),
+                      onPressed: _undo,
+                    ),
+                  ),
+                  Column(
+                    children: [
+                      const Text(
+                        'BASKETBALL TRAINER PRO',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.2),
                       ),
-                      child: Center(
-                        child: Text(
-                          type,
-                          style: TextStyle(
-                            fontSize: 20, // 確保字體完整清晰
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.black : Colors.white,
+                      const SizedBox(height: 4),
+                      Text(
+                        '2026 / 05 / 02',
+                        style: TextStyle(color: Colors.orange.shade400, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // --- 數據統計面板 ---
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildStatItem('SHOTS', totalCount.toString(), Colors.white),
+                  _buildStatItem('MADE', madeCount.toString(), Colors.orangeAccent),
+                  _buildStatItem('ACC%', '${accuracy.toStringAsFixed(1)}%', Colors.cyanAccent),
+                  _buildStatItem('STREAK', _streak.toString(), Colors.yellowAccent),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white10, thickness: 1, indent: 20, endIndent: 20),
+            // --- 罰球計數區 ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+              child: Row(
+                children: [
+                  Text(
+                    '罰球 : 投 $_ftTotal / 中 $_ftMade (${ftAccuracy.toStringAsFixed(1)}%)',
+                    style: const TextStyle(color: Colors.orange, fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 15),
+                  GestureDetector(
+                    onTap: () => setState(() => _ftTotal++),
+                    child: const Icon(Icons.add_circle_outline, color: Colors.white70, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () => setState(() { _ftTotal++; _ftMade++; }),
+                    child: const Icon(Icons.check_circle_outline, color: Colors.white70, size: 24),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: _resetAll,
+                    child: const Icon(Icons.refresh, color: Colors.redAccent, size: 28),
+                  ),
+                ],
+              ),
+            ),
+            // --- 投籃類型選擇器 (不擠壓完整版) ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              child: Row(
+                children: _typeColors.keys.map((type) {
+                  bool isSelected = _currentType == type;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _currentType = type),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: isSelected ? _typeColors[type] : const Color(0xFF2D2D2D),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSelected ? Colors.white : Colors.white12,
+                            width: 2,
+                          ),
+                          boxShadow: isSelected ? [BoxShadow(color: _typeColors[type]!.withOpacity(0.3), blurRadius: 8)] : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            type,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.black : Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-          // 5. 角度提示
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-            decoration: BoxDecoration(color: Colors.yellowAccent, borderRadius: BorderRadius.circular(20)),
-            child: Text(
-              '最後投籃角度: ${_lastAngle.toStringAsFixed(1)}° (90°為正對面)',
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
+            // --- 角度即時顯示 ---
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE101),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+              ),
+              child: Text(
+                '最後投籃角度: ${_lastAngle.toStringAsFixed(1)}°',
+                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.black, fontSize: 17),
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          // 6. IN / OUT 按鈕
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _goalBtn(true, 'IN', Colors.green),
-              const SizedBox(width: 25),
-              _goalBtn(false, 'OUT', Colors.grey.shade700),
-            ],
-          ),
-          // 7. 球場繪圖區
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1C27D),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.orange.shade900, width: 4),
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return GestureDetector(
-                        onTapDown: (d) => _handleTap(d.localPosition, Size(constraints.maxWidth, constraints.maxHeight)),
-                        child: CustomPaint(
-                          size: Size.infinite,
-                          painter: FullCourtPainter(records: _records),
-                        ),
-                      );
-                    },
+            // --- IN / OUT 按鈕 ---
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLargeActionBtn(true),
+                  const SizedBox(width: 30),
+                  _buildLargeActionBtn(false),
+                ],
+              ),
+            ),
+            // --- 球場繪製區域 ---
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(15, 0, 15, 15),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1C27D),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFBF8C4A), width: 5),
+                      boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, spreadRadius: 2)],
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return GestureDetector(
+                          onTapDown: (details) => _handleTap(details.localPosition, Size(constraints.maxWidth, constraints.maxHeight)),
+                          child: CustomPaint(
+                            size: Size.infinite,
+                            painter: BasketballCourtPainter(records: _records),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _statBox(String label, String val, Color c) {
-    return Column(children: [
-      Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
-      Text(val, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: c)),
-    ]);
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
+      ],
+    );
   }
 
-  Widget _goalBtn(bool goal, String txt, Color c) {
-    bool active = _nextIsMade == goal;
-    return ElevatedButton(
-      onPressed: () => setState(() => _nextIsMade = goal),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: active ? (goal ? Colors.green : Colors.red) : Colors.grey[800],
-        minimumSize: const Size(120, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildLargeActionBtn(bool isIn) {
+    bool isSelected = _nextIsMade == isIn;
+    Color btnColor = isIn ? const Color(0xFF4CAF50) : const Color(0xFF424242);
+    if (!isSelected) btnColor = const Color(0xFF333333);
+
+    return InkWell(
+      onTap: () => setState(() => _nextIsMade = isIn),
+      child: Container(
+        width: 130,
+        height: 55,
+        decoration: BoxDecoration(
+          color: btnColor,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: 2),
+        ),
+        child: Center(
+          child: Text(
+            isIn ? 'IN' : 'OUT',
+            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+        ),
       ),
-      child: Text(txt, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
     );
   }
 }
 
-class FullCourtPainter extends CustomPainter {
+class BasketballCourtPainter extends CustomPainter {
   final List<ShotRecord> records;
-  FullCourtPainter({required this.records});
+  BasketballCourtPainter({required this.records});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = Colors.white.withOpacity(0.9)
+    final Paint linePaint = Paint()
+      ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
-    
-    final dotPaint = Paint()..color = Colors.black..style = PaintingStyle.fill;
-    
+
+    final Paint fillPaint = Paint()
+      ..color = Colors.black.withOpacity(0.8)
+      ..style = PaintingStyle.fill;
+
     double w = size.width;
     double h = size.height;
     double midX = w / 2;
     double midY = h / 2;
 
-    // 基本球場標線
+    // 球場中線
     canvas.drawLine(Offset(midX, 0), Offset(midX, h), linePaint);
+    // 中圈
     canvas.drawCircle(Offset(midX, midY), h * 0.18, linePaint);
 
+    // 左右半場繪製
     for (bool isLeft in [true, false]) {
-      double sideMul = isLeft ? 1 : -1;
       double startX = isLeft ? 0 : w;
-      double keyW = w * 0.18;
-      double keyH = h * 0.38;
-      // 禁區
-      canvas.drawRect(Rect.fromCenter(center: Offset(startX + (sideMul * keyW / 2), midY), width: keyW, height: keyH), linePaint);
-      // 三分線與籃框點
-      double threeR = h * 0.42;
-      canvas.drawArc(Rect.fromCenter(center: Offset(startX + (w * 0.05 * sideMul), midY), width: (w * 0.3) * 2, height: threeR * 2), isLeft ? -math.pi / 2 : math.pi / 2, math.pi, false, linePaint);
+      double multiplier = isLeft ? 1 : -1;
+
+      // 禁區 (Key)
+      double keyWidth = w * 0.18;
+      double keyHeight = h * 0.35;
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset(startX + (keyWidth / 2 * multiplier), midY), width: keyWidth, height: keyHeight),
+        linePaint,
+      );
+
+      // 三分線 (3-Point Line)
+      double threeRadius = h * 0.42;
+      canvas.drawArc(
+        Rect.fromCenter(center: Offset(startX + (w * 0.05 * multiplier), midY), width: w * 0.6, height: threeRadius * 2),
+        isLeft ? -math.pi / 2 : math.pi / 2,
+        math.pi,
+        false,
+        linePaint,
+      );
+
+      // 籃框圓點
+      canvas.drawCircle(Offset(isLeft ? w * 0.08 : w * 0.92, midY), 10, fillPaint);
     }
 
-    // 籃框圓點
-    canvas.drawCircle(Offset(w * 0.08, midY), 12, dotPaint);
-    canvas.drawCircle(Offset(w * 0.92, midY), 12, dotPaint);
+    // 繪製投籃點與角度標籤
+    for (var record in records) {
+      final Paint pPaint = Paint()..color = record.color;
+      canvas.drawCircle(record.position, 8, pPaint);
 
-    // 繪製記錄點與角度文字
-    for (var r in records) {
-      final pPaint = Paint()..color = r.color;
-      canvas.drawCircle(r.position, 8, pPaint);
-      
-      if (!r.isMade) {
-        canvas.drawCircle(r.position, 8, Paint()..color = Colors.black..style = PaintingStyle.stroke..strokeWidth = 2);
+      // 如果沒進，加個黑框
+      if (!record.isMade) {
+        canvas.drawCircle(record.position, 8, Paint()..color = Colors.black..style = PaintingStyle.stroke..strokeWidth = 2);
       }
 
-      final textPainter = TextPainter(
+      // 角度文字顯示
+      final TextPainter tp = TextPainter(
         text: TextSpan(
-          text: '${r.angle.toStringAsFixed(1)}°',
-          style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold, backgroundColor: Colors.white70),
+          text: '${record.angle.toStringAsFixed(1)}°',
+          style: const TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.bold, backgroundColor: Colors.white70),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(canvas, Offset(r.position.dx - (textPainter.width / 2), r.position.dy - 22));
+      tp.paint(canvas, Offset(record.position.dx - (tp.width / 2), record.position.dy - 24));
     }
   }
 
