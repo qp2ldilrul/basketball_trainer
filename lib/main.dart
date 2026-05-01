@@ -27,7 +27,7 @@ class BasketballProApp extends StatelessWidget {
 }
 
 class ShotRecord {
-  final Offset position; // 歸一化座標 (0~1)
+  final Offset position;
   final bool isMade;
   final double angle;
   final String type;
@@ -43,62 +43,7 @@ class ShotRecord {
 }
 
 class ShotProScreen extends StatefulWidget {
-  const ShotProScreen({super.override});
-
-  @override
-  State<ShotProScreen> createState() => _ShotProScreenState();
-}
-
-class _ShotProScreenState extends State<ShotProScreen> {
-  List<ShotRecord> shotRecords = [];
-  bool nextShotIsMade = true;
-  double currentAngle = 0.0;
-  String currentType = '定點';
-  int streak = 0;
-  double selectedAspectRatio = 16 / 9; // 預設橫向比例
-
-  final Map<String, Color> typeColors = {
-    '定點': Colors.cyanAccent,
-    '跳投': Colors.purpleAccent,
-    '運球': Colors.amberAccent,
-    '上籃': Colors.greenAccent,
-    '勾射': Colors.orangeAccent,
-  };
-
-  void handleTap(Offset localPosition, Size boxSize) {
-    HapticFeedback.mediumImpact(); // 點擊震動感
-    
-    // 計算歸一化座標
-    double nx = localPosition.dx / boxSize.width;
-    double ny = localPosition.dy / boxSize.height;
-
-    // 計算角度 (以左側籃框中心點約 10%, 50% 為基準)
-    double basketX = boxSize.width * 0.1;
-    double basketY = boxSize.height * 0.5;
-    double dx = localPosition.dx - basketX;
-    double dy = localPosition.dy - basketY;
-    double degrees = math.atan2(dy, dx) * 180 / math.pi;
-
-    setState(() {
-      currentAngle = degrees.abs();
-      shotRecords.add(ShotRecord(
-        position: Offset(nx, ny),
-        isMade: nextShotIsMade,
-        angle: currentAngle,
-        type: currentType,
-        color: typeColors[currentType]!,
-      ));
-      _updateStreak();
-    });
-  }
-
-  void _updateStreak() {
-    int s = 0;
-    for (var i = shotRecords.length - 1; i >= 0; i--) {
-      if (shotRecords[i].isMade) s++; else break;
-    }
-    streak = s;
-  }
+  const ShotProScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -111,41 +56,41 @@ class _ShotProScreenState extends State<ShotProScreen> {
         centerTitle: true,
         title: Column(
           children: [
-            const Text('PRO SHOT ANALYTICS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            Text(today, style: const TextStyle(fontSize: 10, color: Colors.orangeAccent)),
+            const Text('PRO COURT ANALYTICS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            Text(today, style: const TextStyle(fontSize: 12, color: Colors.orangeAccent, fontWeight: FontWeight.w500)),
           ],
         ),
-        leading: IconButton(icon: const Icon(Icons.undo), onPressed: () => setState(() { if(shotRecords.isNotEmpty) shotRecords.removeLast(); _updateStreak(); })),
+        leading: IconButton(icon: const Icon(Icons.undo), onPressed: undoLastShot),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh, color: Colors.redAccent), onPressed: () => setState(() { shotRecords.clear(); streak = 0; })),
+          IconButton(icon: const Icon(Icons.refresh, color: Colors.redAccent), onPressed: resetAll),
         ],
       ),
       body: Column(
         children: [
           _buildStatsRow(),
-          _buildRatioSelector(),
-          _buildControls(),
+          _buildFreeThrowSection(), // 獨立罰球點擊區塊
+          _buildShotControls(),
           
           Expanded(
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(10.0),
+                padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 10.0),
                 child: AspectRatio(
-                  aspectRatio: selectedAspectRatio,
+                  aspectRatio: 16 / 9,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3D299), // 淺木地板底色
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.brown[700]!, width: 4),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 15)],
+                      color: const Color(0xFFF1C27D), 
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange[900]!, width: 4),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20)],
                     ),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         return GestureDetector(
-                          onTapDown: (d) => handleTap(d.localPosition, Size(constraints.maxWidth, constraints.maxHeight)),
+                          onTapDown: (d) => handleCourtTap(d.localPosition, Size(constraints.maxWidth, constraints.maxHeight)),
                           child: CustomPaint(
                             size: Size.infinite,
-                            painter: HandDrawnCourtPainter(records: List.from(shotRecords)),
+                            painter: ProfessionalCourtPainter(records: List.from(shotRecords)),
                           ),
                         );
                       }
@@ -160,63 +105,132 @@ class _ShotProScreenState extends State<ShotProScreen> {
     );
   }
 
+  // --- 狀態管理 ---
+  List<ShotRecord> shotRecords = [];
+  bool nextShotIsMade = true;
+  double currentAngle = 0.0;
+  String currentType = '定點';
+  int streak = 0;
+
+  // 獨立罰球變數
+  int ftTotal = 0;
+  int ftMade = 0;
+
+  final Map<String, Color> typeColors = {
+    '定點': Colors.cyanAccent,
+    '跳投': Colors.purpleAccent,
+    '運球': Colors.amberAccent,
+    '上籃': Colors.greenAccent,
+    '勾射': Colors.orangeAccent,
+  };
+
+  void handleCourtTap(Offset localPosition, Size boxSize) {
+    HapticFeedback.mediumImpact();
+    double basketX = boxSize.width * 0.08;
+    double basketY = boxSize.height * 0.5;
+    double dx = localPosition.dx - basketX;
+    double dy = localPosition.dy - basketY;
+    double degrees = math.atan2(dy, dx) * 180 / math.pi;
+
+    setState(() {
+      currentAngle = degrees.abs();
+      shotRecords.add(ShotRecord(
+        position: localPosition,
+        isMade: nextShotIsMade,
+        angle: currentAngle,
+        type: currentType,
+        color: typeColors[currentType]!,
+      ));
+      _updateStreak();
+    });
+  }
+
+  void _updateStreak() {
+    int s = 0;
+    for (var i = shotRecords.length - 1; i >= 0; i--) {
+      if (shotRecords[i].isMade) s++; else break;
+    }
+    setState(() => streak = s);
+  }
+
+  void undoLastShot() {
+    setState(() {
+      if(shotRecords.isNotEmpty) shotRecords.removeLast();
+      _updateStreak();
+    });
+  }
+
+  void resetAll() {
+    setState(() {
+      shotRecords.clear();
+      streak = 0;
+      ftTotal = 0;
+      ftMade = 0;
+    });
+  }
+
+  // --- UI 元件 ---
+
   Widget _buildStatsRow() {
     int made = shotRecords.where((r) => r.isMade).length;
     double acc = shotRecords.isEmpty ? 0 : (made / shotRecords.length) * 100;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       color: const Color(0xFF252525),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _statCol('TOTAL', shotRecords.length.toString(), Colors.white),
+          _statCol('FIELD SHOTS', shotRecords.length.toString(), Colors.white),
           _statCol('ACC%', '${acc.toStringAsFixed(1)}%', Colors.cyanAccent),
-          _statCol('STREAK', streak.toString(), Colors.orangeAccent),
+          _statCol('STREAK', streak.toString(), Colors.yellowAccent),
         ],
       ),
     );
   }
 
-  Widget _statCol(String l, String v, Color c) {
-    return Column(children: [
-      Text(l, style: const TextStyle(fontSize: 9, color: Colors.grey)),
-      Text(v, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: c)),
-    ]);
-  }
-
-  Widget _buildRatioSelector() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            const SizedBox(width: 10),
-            _ratioBtn(16 / 9, '橫向 16:9'),
-            _ratioBtn(4 / 3, 'iPad 4:3'),
-            _ratioBtn(9 / 16, '手機 9:16'),
-            _ratioBtn(1 / 1, '1:1'),
-          ],
-        ),
+  // 獨立的罰球區塊
+  Widget _buildFreeThrowSection() {
+    double ftAcc = ftTotal == 0 ? 0 : (ftMade / ftTotal) * 100;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Text('罰球數據:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
+          const SizedBox(width: 15),
+          Expanded(child: Text('投 $ftTotal / 中 $ftMade (${ftAcc.toStringAsFixed(1)}%)', style: const TextStyle(fontFamily: 'monospace'))),
+          // 增加總投球數
+          _ftButton(icon: Icons.add, color: Colors.grey, onTap: () => setState(() => ftTotal++)),
+          const SizedBox(width: 8),
+          // 增加進球數 (進球時總數也會同步增加)
+          _ftButton(icon: Icons.sports_basketball, color: Colors.orangeAccent, onTap: () => setState(() { ftTotal++; ftMade++; })),
+          const SizedBox(width: 8),
+          // 倒扣按鈕 (修正點錯時)
+          _ftButton(icon: Icons.remove, color: Colors.redAccent.withOpacity(0.5), onTap: () => setState(() { if(ftTotal > 0) ftTotal--; if(ftMade > ftTotal) ftMade = ftTotal; })),
+        ],
       ),
     );
   }
 
-  Widget _ratioBtn(double r, String n) {
-    bool s = selectedAspectRatio == r;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: ChoiceChip(
-        label: Text(n, style: const TextStyle(fontSize: 10)),
-        selected: s,
-        onSelected: (val) => setState(() => selectedAspectRatio = r),
+  Widget _ftButton({required IconData icon, required Color color, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(5), border: Border.all(color: color)),
+        child: Icon(icon, size: 18, color: color),
       ),
     );
   }
 
-  Widget _buildControls() {
+  Widget _buildShotControls() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       child: Row(
         children: [
           Expanded(
@@ -224,9 +238,9 @@ class _ShotProScreenState extends State<ShotProScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: typeColors.keys.map((t) => Padding(
-                  padding: const EdgeInsets.only(right: 5),
+                  padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(t, style: const TextStyle(fontSize: 11)),
+                    label: Text(t, style: const TextStyle(fontSize: 12)),
                     selected: currentType == t,
                     onSelected: (s) => setState(() => currentType = t),
                   ),
@@ -234,9 +248,9 @@ class _ShotProScreenState extends State<ShotProScreen> {
               ),
             ),
           ),
-          _goalBtn(true, 'GOAL', Colors.green),
-          const SizedBox(width: 5),
-          _goalBtn(false, 'MISS', Colors.red),
+          _goalBtn(true, 'GOAL', Colors.greenAccent),
+          const SizedBox(width: 8),
+          _goalBtn(false, 'MISS', Colors.redAccent),
         ],
       ),
     );
@@ -247,42 +261,43 @@ class _ShotProScreenState extends State<ShotProScreen> {
     return GestureDetector(
       onTap: () => setState(() => nextShotIsMade = m),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
           color: a ? c.withOpacity(0.3) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: a ? c : Colors.white24),
+          border: Border.all(color: a ? c : Colors.white24, width: 2),
         ),
-        child: Text(l, style: TextStyle(color: a ? c : Colors.white30, fontSize: 11, fontWeight: FontWeight.bold)),
+        child: Text(l, style: TextStyle(color: a ? c : Colors.white30, fontSize: 12, fontWeight: FontWeight.bold)),
       ),
     );
   }
+
+  Widget _statCol(String l, String v, Color c) {
+    return Column(children: [
+      Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+      Text(v, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: c)),
+    ]);
+  }
 }
 
-class HandDrawnCourtPainter extends CustomPainter {
+class ProfessionalCourtPainter extends CustomPainter {
   final List<ShotRecord> records;
-  HandDrawnCourtPainter({required this.records});
+  ProfessionalCourtPainter({required this.records});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = Colors.white.withOpacity(0.9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-
-    final paintAreaPaint = Paint()
-      ..color = const Color(0xFFE67E22) // 實心橘色禁區
-      ..style = PaintingStyle.fill;
+    final linePaint = Paint()..color = Colors.white.withOpacity(0.9)..style = PaintingStyle.stroke..strokeWidth = 2.0;
+    final paintAreaPaint = Paint()..color = const Color(0xFFE67E22)..style = PaintingStyle.fill;
+    final basketPaint = Paint()..color = Colors.black87..style = PaintingStyle.fill;
 
     double midX = size.width / 2;
     double midY = size.height / 2;
+    double basketOffset = size.width * 0.08;
 
-    // 1. 繪製全場樣式 (橫向)
-    // 中線與中圈
+    // 1. 球場底色與禁區
     canvas.drawLine(Offset(midX, 0), Offset(midX, size.height), linePaint);
-    canvas.drawCircle(Offset(midX, midY), size.height * 0.18, linePaint);
+    canvas.drawCircle(Offset(midX, midY), size.height * 0.2, linePaint);
     
-    // 兩側禁區 (強制實心橘)
     double kw = size.width * 0.18;
     double kh = size.height * 0.45;
     canvas.drawRect(Rect.fromLTWH(0, midY - kh/2, kw, kh), paintAreaPaint);
@@ -290,34 +305,30 @@ class HandDrawnCourtPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(size.width - kw, midY - kh/2, kw, kh), paintAreaPaint);
     canvas.drawRect(Rect.fromLTWH(size.width - kw, midY - kh/2, kw, kh), linePaint);
 
-    // 三分線 (圓弧)
+    // 2. 籃框標記
+    canvas.drawCircle(Offset(basketOffset, midY), 6, basketPaint);
+    canvas.drawLine(Offset(basketOffset - 5, midY - 15), Offset(basketOffset - 5, midY + 15), linePaint..strokeWidth = 3);
+    canvas.drawCircle(Offset(size.width - basketOffset, midY), 6, basketPaint);
+    canvas.drawLine(Offset(size.width - basketOffset + 5, midY - 15), Offset(size.width - basketOffset + 5, midY + 15), linePaint);
+
+    // 3. 三分線
     double tr = size.height * 0.48;
-    canvas.drawArc(Rect.fromCircle(center: Offset(20, midY), radius: tr), -math.pi/2, math.pi, false, linePaint);
-    canvas.drawArc(Rect.fromCircle(center: Offset(size.width - 20, midY), radius: tr), math.pi/2, math.pi, false, linePaint);
+    canvas.drawArc(Rect.fromCircle(center: Offset(basketOffset, midY), radius: tr), -1.3, 2.6, false, linePaint..strokeWidth = 2);
+    canvas.drawArc(Rect.fromCircle(center: Offset(size.width - basketOffset, midY), radius: tr), 1.85, 2.6, false, linePaint);
 
-    // 2. 繪製點位標籤 (類型+角度)
+    // 4. 繪製球場投籃點
     for (var r in records) {
-      final pos = Offset(r.position.dx * size.width, r.position.dy * size.height);
+      final pos = r.position;
       final c = r.color;
-
       if (r.isMade) {
-        canvas.drawCircle(pos, 6, Paint()..color = c);
-        canvas.drawCircle(pos, 12, Paint()..color = c.withOpacity(0.3)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+        canvas.drawCircle(pos, 7, Paint()..color = c);
       } else {
-        canvas.drawCircle(pos, 6, Paint()..color = c..style = PaintingStyle.stroke..strokeWidth = 2);
-        canvas.drawLine(Offset(pos.dx-4, pos.dy-4), Offset(pos.dx+4, pos.dy+4), Paint()..color = c..strokeWidth = 2.5);
-        canvas.drawLine(Offset(pos.dx+4, pos.dy-4), Offset(pos.dx-4, pos.dy+4), Paint()..color = c..strokeWidth = 2.5);
+        canvas.drawCircle(pos, 7, Paint()..color = c..style = PaintingStyle.stroke..strokeWidth = 2.5);
+        canvas.drawLine(Offset(pos.dx-5, pos.dy-5), Offset(pos.dx+5, pos.dy+5), Paint()..color = c..strokeWidth = 2);
+        canvas.drawLine(Offset(pos.dx+5, pos.dy-5), Offset(pos.dx-5, pos.dy+5), Paint()..color = c..strokeWidth = 2);
       }
-
-      // 文字標籤：類型 + 角度
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '${r.type[0]}${r.angle.toInt()}°',
-          style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold, backgroundColor: c.withOpacity(0.8)),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(pos.dx + 10, pos.dy - 12));
+      final tp = TextPainter(text: TextSpan(text: '${r.type[0]}${r.angle.toInt()}°', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold, backgroundColor: c.withOpacity(0.85))), textDirection: TextDirection.ltr)..layout();
+      tp.paint(canvas, Offset(pos.dx + 12, pos.dy - 14));
     }
   }
 
