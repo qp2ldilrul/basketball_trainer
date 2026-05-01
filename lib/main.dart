@@ -57,7 +57,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
   int _ftTotal = 0;
   int _ftMade = 0;
 
-  // 五種高對比色
+  // 五種高對比對應顏色
   final Map<String, Color> _typeColors = {
     '定點': Colors.cyanAccent,      
     '跳投': Colors.magentaAccent,   
@@ -67,14 +67,18 @@ class _ShotProScreenState extends State<ShotProScreen> {
   };
 
   void _handleTap(Offset pos, Size size) {
+    // 籃框中心點 (左側籃框)
     double bx = size.width * 0.08;
     double by = size.height * 0.5;
-    double dx = pos.dx - bx;
+    
+    // 計算角度 (考慮兩側，以最靠近的籃框為準)
+    double targetX = pos.dx > size.width / 2 ? size.width - bx : bx;
+    double dx = pos.dx - targetX;
     double dy = pos.dy - by;
-    double deg = math.atan2(dy, dx) * 180 / math.pi;
+    double deg = (math.atan2(dy, dx) * 180 / math.pi).abs();
 
     setState(() {
-      _currentAngle = deg.abs();
+      _currentAngle = deg;
       _records.add(ShotRecord(
         position: pos,
         isMade: _nextIsMade,
@@ -96,9 +100,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final dateStr = "${now.year} / ${now.month.toString().padLeft(2, '0')} / ${now.day.toString().padLeft(2, '0')}";
-    
     int total = _records.length;
     int made = _records.where((r) => r.isMade).length;
     double acc = total == 0 ? 0 : (made / total) * 100;
@@ -107,35 +108,19 @@ class _ShotProScreenState extends State<ShotProScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF2D2D2D),
-        title: Column(
-          children: [
-            const Text('PRO COURT ANALYTICS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Text(dateStr, style: const TextStyle(fontSize: 12, color: Colors.orangeAccent)),
-          ],
-        ),
+        title: const Text('PRO COURT ANALYTICS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.undo),
-          onPressed: () => setState(() {
-            if (_records.isNotEmpty) _records.removeLast();
-            _updateStreak();
-          }),
-        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.redAccent),
             onPressed: () => setState(() {
-              _records.clear();
-              _streak = 0;
-              _ftTotal = 0;
-              _ftMade = 0;
+              _records.clear(); _streak = 0; _ftTotal = 0; _ftMade = 0;
             }),
           )
         ],
       ),
       body: Column(
         children: [
-          // 數據統計面板
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             color: const Color(0xFF252525),
@@ -143,67 +128,38 @@ class _ShotProScreenState extends State<ShotProScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _statBox('SHOTS', total.toString(), Colors.white),
-                _statBox('MADE', made.toString(), Colors.orangeAccent),
                 _statBox('ACC%', '${acc.toStringAsFixed(1)}%', Colors.cyanAccent),
                 _statBox('STREAK', _streak.toString(), Colors.yellowAccent),
               ],
             ),
           ),
 
-          // 罰球數據追蹤
           Padding(
-            padding: const EdgeInsets.all(12),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.orangeAccent.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Text('罰球：', style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
-                  Expanded(child: Text('投 $_ftTotal / 中 $_ftMade (${ftAcc.toStringAsFixed(1)}%)')),
-                  _circleBtn(Icons.add, Colors.grey, () => setState(() => _ftTotal++)),
-                  const SizedBox(width: 8),
-                  _circleBtn(Icons.sports_basketball, Colors.orangeAccent, () => setState(() { _ftTotal++; _ftMade++; })),
-                  const SizedBox(width: 8),
-                  _circleBtn(Icons.remove, Colors.redAccent, () => setState(() { if(_ftTotal > 0) _ftTotal--; if(_ftMade > _ftTotal) _ftMade = _ftTotal; })),
-                ],
-              ),
-            ),
-          ),
-
-          // 投籃類型選擇器 (定、跳、運、上、勾)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _typeColors.keys.map((type) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(type, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                          selected: _currentType == type,
-                          selectedColor: _typeColors[type],
-                          labelStyle: TextStyle(color: _currentType == type ? Colors.black : Colors.white),
-                          onSelected: (s) => setState(() => _currentType = type),
-                        ),
-                      )).toList(),
-                    ),
-                  ),
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: _typeColors.keys.map((type) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ChoiceChip(
+                  label: Text(type, style: const TextStyle(fontSize: 12)),
+                  selected: _currentType == type,
+                  selectedColor: _typeColors[type],
+                  labelStyle: TextStyle(color: _currentType == type ? Colors.black : Colors.white),
+                  onSelected: (s) => setState(() => _currentType = type),
                 ),
-                _toggleGoal(true, 'IN', Colors.greenAccent),
-                const SizedBox(width: 5),
-                _toggleGoal(false, 'OUT', Colors.redAccent),
-              ],
+              )).toList(),
             ),
           ),
 
-          // 球場與繪圖區域
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _toggleGoal(true, 'IN', Colors.greenAccent),
+              const SizedBox(width: 20),
+              _toggleGoal(false, 'OUT', Colors.redAccent),
+            ],
+          ),
+
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(15),
@@ -242,29 +198,18 @@ class _ShotProScreenState extends State<ShotProScreen> {
     ]);
   }
 
-  Widget _circleBtn(IconData icon, Color c, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c)),
-        child: Icon(icon, size: 16, color: c),
-      ),
-    );
-  }
-
   Widget _toggleGoal(bool goal, String txt, Color c) {
     bool active = _nextIsMade == goal;
-    return GestureDetector(
+    return InkWell(
       onTap: () => setState(() => _nextIsMade = goal),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         decoration: BoxDecoration(
           color: active ? c.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: active ? c : Colors.white24, width: 2),
         ),
-        child: Text(txt, style: TextStyle(color: active ? c : Colors.white38, fontWeight: FontWeight.bold, fontSize: 12)),
+        child: Text(txt, style: TextStyle(color: active ? c : Colors.white38, fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -279,57 +224,38 @@ class WebCourtPainter extends CustomPainter {
     final linePaint = Paint()..color = Colors.white.withOpacity(0.8)..style = PaintingStyle.stroke..strokeWidth = 2.0;
     final rimPaint = Paint()..color = Colors.redAccent..style = PaintingStyle.stroke..strokeWidth = 2.5;
     final boardPaint = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 3.0;
-    final paintArea = Paint()..color = const Color(0xFFE67E22)..style = PaintingStyle.fill;
     
     double mx = size.width / 2;
     double my = size.height / 2;
     double bx = size.width * 0.08;
 
-    // 球場基本線
+    // 球場線條
     canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), linePaint);
     canvas.drawCircle(Offset(mx, my), size.height * 0.2, linePaint);
     
-    double kw = size.width * 0.18;
-    double kh = size.height * 0.45;
-    canvas.drawRect(Rect.fromLTWH(0, my - kh/2, kw, kh), paintArea);
-    canvas.drawRect(Rect.fromLTWH(0, my - kh/2, kw, kh), linePaint);
-    canvas.drawRect(Rect.fromLTWH(size.width - kw, my - kh/2, kw, kh), paintArea);
-    canvas.drawRect(Rect.fromLTWH(size.width - kw, my - kh/2, kw, kh), linePaint);
-
-    double tr = size.height * 0.48;
-    canvas.drawArc(Rect.fromCircle(center: Offset(bx, my), radius: tr), -1.3, 2.6, false, linePaint);
-    canvas.drawArc(Rect.fromCircle(center: Offset(size.width - bx, my), radius: tr), 1.85, 2.6, false, linePaint);
-
-    // 補上雙邊籃圈與籃板
-    // 左側
+    // 籃圈與籃板
     canvas.drawLine(Offset(size.width * 0.04, my - 25), Offset(size.width * 0.04, my + 25), boardPaint);
-    canvas.drawCircle(Offset(bx, my), 8, rimPaint);
-    // 右側
+    canvas.drawCircle(Offset(bx, my), 10, rimPaint);
     canvas.drawLine(Offset(size.width * 0.96, my - 25), Offset(size.width * 0.96, my + 25), boardPaint);
-    canvas.drawCircle(Offset(size.width - bx, my), 8, rimPaint);
+    canvas.drawCircle(Offset(size.width - bx, my), 10, rimPaint);
 
-    // 繪製投籃點與數據文字標籤
+    // 投籃點與文字
     for (var r in records) {
       final p = r.position;
-      final pColor = Paint()..color = r.color;
+      final paint = Paint()..color = r.color;
 
       if (r.isMade) {
-        canvas.drawCircle(p, 6, pColor);
+        canvas.drawCircle(p, 6, paint);
       } else {
-        canvas.drawCircle(p, 6, pColor..style = PaintingStyle.stroke..strokeWidth = 2);
-        canvas.drawLine(Offset(p.dx-4, p.dy-4), Offset(p.dx+4, p.dy+4), pColor);
-        canvas.drawLine(Offset(p.dx+4, p.dy-4), Offset(p.dx-4, p.dy+4), pColor);
+        canvas.drawCircle(p, 6, paint..style = PaintingStyle.stroke..strokeWidth = 2);
+        canvas.drawLine(Offset(p.dx-4, p.dy-4), Offset(p.dx+4, p.dy+4), paint);
+        canvas.drawLine(Offset(p.dx+4, p.dy-4), Offset(p.dx-4, p.dy+4), paint);
       }
 
-      // 文字數據渲染 (投籃類型首字 + 角度)
+      // 標籤渲染 (類型首字 + 角度)
       final textSpan = TextSpan(
         text: '${r.type[0]}${r.angle.toInt()}°',
-        style: TextStyle(
-          color: Colors.black, 
-          fontSize: 10, 
-          fontWeight: FontWeight.bold, 
-          backgroundColor: r.color.withOpacity(0.9)
-        ),
+        style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold, backgroundColor: r.color.withOpacity(0.9)),
       );
       final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
       tp.paint(canvas, Offset(p.dx + 8, p.dy - 12));
