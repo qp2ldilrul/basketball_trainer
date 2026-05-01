@@ -55,9 +55,10 @@ class _ShotProScreenState extends State<ShotProScreen> {
   int _ftTotal = 0;
   int _ftMade = 0;
 
+  // 已修正：將不可用的 magentaAccent 換成 purpleAccent
   final Map<String, Color> _typeColors = {
     '定點': Colors.cyanAccent,      
-    '跳投': Colors.magentaAccent,   
+    '跳投': Colors.purpleAccent,   
     '運球': Colors.yellowAccent,    
     '上籃': Colors.limeAccent,      
     '勾射': Colors.orangeAccent,    
