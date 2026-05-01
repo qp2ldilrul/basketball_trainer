@@ -71,14 +71,15 @@ class _ShotProScreenState extends State<ShotProScreen> {
     double basketY = size.height / 2;
 
     // 計算相對於籃框的位移
-    // dx: 往場內的距離 (正數)
-    // dy: 偏離中心線的距離 (正數)
+    // dx: 往場內的水平距離 (取絕對值)
+    // dy: 偏離中心線的垂直距離 (取絕對值)
     double dx = isLeftHalf ? (pos.dx - basketX) : (basketX - pos.dx);
     double dy = (pos.dy - basketY).abs();
 
     // 角度計算：
     // 使用 atan2(垂直位移, 水平位移) 得到與中心水平線的夾角 (0~90度)
-    // 加上 90 度，使得正對面(dy=0)是 90度，底角(dx趨近0)是 180度
+    // 當正對籃框時，dy=0, dx大 -> rad=0, 我們希望顯示 90
+    // 當在底角時，dx趨近0, dy大 -> rad=pi/2, 我們希望顯示 180
     double rad = math.atan2(dy, dx);
     double deg = rad * 180 / math.pi;
     double finalAngle = 90 + deg;
@@ -93,7 +94,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
         color: _typeColors[_currentType]!,
       ));
       
-      // 更新連進次數
+      // 更新連進次數 (Streak)
       int currentStreak = 0;
       for (int i = _records.length - 1; i >= 0; i--) {
         if (_records[i].isMade) {
@@ -217,7 +218,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
                 ],
               ),
             ),
-            // --- 投籃類型選擇器 (不擠壓完整版) ---
+            // --- 投籃類型選擇器 (平均分配空間) ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
               child: Row(
@@ -236,7 +237,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
                             color: isSelected ? Colors.white : Colors.white12,
                             width: 2,
                           ),
-                          boxShadow: isSelected ? [BoxShadow(color: _typeColors[type]!.withOpacity(0.3), blurRadius: 8)] : null,
                         ),
                         child: Center(
                           child: Text(
@@ -254,18 +254,21 @@ class _ShotProScreenState extends State<ShotProScreen> {
                 }).toList(),
               ),
             ),
-            // --- 角度即時顯示 ---
+            // --- 角度即時顯示 (修正 FontWeight) ---
             Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFFEE101),
                 borderRadius: BorderRadius.circular(25),
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
               ),
               child: Text(
                 '最後投籃角度: ${_lastAngle.toStringAsFixed(1)}°',
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.black, fontSize: 17),
+                style: const TextStyle(
+                  color: Colors.black, 
+                  fontWeight: FontWeight.w900, // 修正處：使用有效權重
+                  fontSize: 17
+                ),
               ),
             ),
             // --- IN / OUT 按鈕 ---
@@ -291,7 +294,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
                       color: const Color(0xFFF1C27D),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: const Color(0xFFBF8C4A), width: 5),
-                      boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, spreadRadius: 2)],
                     ),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
@@ -408,16 +410,19 @@ class BasketballCourtPainter extends CustomPainter {
       final Paint pPaint = Paint()..color = record.color;
       canvas.drawCircle(record.position, 8, pPaint);
 
-      // 如果沒進，加個黑框
       if (!record.isMade) {
         canvas.drawCircle(record.position, 8, Paint()..color = Colors.black..style = PaintingStyle.stroke..strokeWidth = 2);
       }
 
-      // 角度文字顯示
       final TextPainter tp = TextPainter(
         text: TextSpan(
           text: '${record.angle.toStringAsFixed(1)}°',
-          style: const TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.bold, backgroundColor: Colors.white70),
+          style: const TextStyle(
+            color: Colors.black, 
+            fontSize: 13, 
+            fontWeight: FontWeight.bold, 
+            backgroundColor: Colors.white70
+          ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
