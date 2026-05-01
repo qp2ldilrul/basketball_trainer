@@ -18,7 +18,7 @@ class ShotRecord {
   final Offset position;
   final bool isMade;
   final double angle;
-  final String type; // 投籃類型
+  final String type;
   ShotRecord({required this.position, required this.isMade, required this.angle, required this.type});
 }
 
@@ -32,8 +32,8 @@ class _ShotProScreenState extends State<ShotProScreen> {
   List<ShotRecord> shotRecords = [];
   bool nextShotIsMade = true;
   double currentAngle = 45.0;
-  String currentType = '定點'; // 預設投籃類型
-  int streak = 0; // 連進紀錄
+  String currentType = '定點';
+  int streak = 0;
   int maxStreak = 0;
 
   void handleTap(Offset pos) {
@@ -61,7 +61,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('大兒子籃球科學分析'),
+        title: const Text('大兒子投籃位置與角度分析'),
         backgroundColor: Colors.orange[400],
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: () => setState(() { shotRecords.clear(); streak=0; }))
@@ -69,54 +69,55 @@ class _ShotProScreenState extends State<ShotProScreen> {
       ),
       body: Column(
         children: [
-          // 1. 遊戲化數據看板 [優化1]
+          // 數據統計區域
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             child: Card(
-              elevation: 4,
+              elevation: 2,
               color: Colors.orange[50],
               child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildStat('命中率', '${rate.toStringAsFixed(1)}%', isHighlight: rate >= 50),
-                        _buildStat('連進', streak.toString(), isHighlight: streak > 0),
-                        _buildStat('最高連進', maxStreak.toString()),
-                      ],
-                    ),
-                    if (rate >= 50 && shotRecords.length >= 5) 
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: Text('🔥 進入神射手狀態！', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                      ),
+                    _buildStat('總投籃', '${shotRecords.length}'),
+                    _buildStat('命中', '${shotRecords.where((r)=>r.isMade).length}'),
+                    _buildStat('命中率', '${rate.toStringAsFixed(1)}%', isHighlight: rate >= 50),
+                    _buildStat('連進', streak.toString(), isHighlight: streak > 0),
                   ],
                 ),
               ),
             ),
           ),
 
-          // 2. 角度與模式控制 [優化2]
+          // 控制區域
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
                 Row(
                   children: [
-                    Text('角度: ${currentAngle.toInt()}°', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Expanded(
-                      child: Slider(
-                        value: currentAngle, min: 0, max: 90, divisions: 90,
-                        onChanged: (v) => setState(() => currentAngle = v),
-                      ),
+                    Text('目前設定角度: ${currentAngle.toInt()}°', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    ChoiceChip(
+                      label: const Text('進'),
+                      selected: nextShotIsMade == true,
+                      onSelected: (v) => setState(() => nextShotIsMade = true),
+                      selectedColor: Colors.green[200],
                     ),
-                    Switch(value: nextShotIsMade, activeColor: Colors.green, onChanged: (v) => setState(() => nextShotIsMade = v)),
-                    Text(nextShotIsMade ? '進球' : '未進'),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('沒'),
+                      selected: nextShotIsMade == false,
+                      onSelected: (v) => setState(() => nextShotIsMade = false),
+                      selectedColor: Colors.red[200],
+                    ),
                   ],
                 ),
-                // 3. 投籃類型標籤 [優化4]
+                Slider(
+                  value: currentAngle, min: 0, max: 90, divisions: 90,
+                  onChanged: (v) => setState(() => currentAngle = v),
+                ),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -134,19 +135,21 @@ class _ShotProScreenState extends State<ShotProScreen> {
             ),
           ),
 
-          // 4. 放大版球場 [優化：場地變大]
+          // 修正後的球場畫布 http://googleusercontent.com/image_content/214
+
+
           Expanded(
             child: Container(
-              margin: const EdgeInsets.all(15),
+              margin: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.orange[200]!, width: 2),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.grey[300]!),
               ),
               child: GestureDetector(
                 onTapDown: (d) => handleTap(d.localPosition),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(15),
                   child: CustomPaint(
                     size: Size.infinite,
                     painter: CourtPainter(records: shotRecords),
@@ -154,10 +157,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
                 ),
               ),
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(bottom: 5),
-            child: Text('點擊球場紀錄位置', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),
@@ -167,8 +166,8 @@ class _ShotProScreenState extends State<ShotProScreen> {
   Widget _buildStat(String label, String value, {bool isHighlight = false}) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isHighlight ? Colors.red : Colors.orange[800])),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isHighlight ? Colors.red : Colors.orange[800])),
       ],
     );
   }
@@ -180,25 +179,38 @@ class CourtPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()..color = Colors.orange[200]!..style = PaintingStyle.stroke..strokeWidth = 3;
-    final center = Offset(size.width / 2, 60);
+    final linePaint = Paint()..color = Colors.grey[400]!..style = PaintingStyle.stroke..strokeWidth = 2;
+    
+    // 1. 設定籃框位置 (靠近頂部中央)
+    final rimCenter = Offset(size.width / 2, size.height * 0.15);
+    canvas.drawCircle(rimCenter, 12, linePaint); // 籃框
 
-    // 繪製加大版球場線條
-    canvas.drawCircle(center, 15, linePaint); // 籃框
-    canvas.drawRect(Rect.fromCenter(center: Offset(size.width / 2, 100), width: 120, height: 140), linePaint); // 禁區
-    canvas.drawArc(Rect.fromCircle(center: center, radius: size.width * 0.8), 0, 3.14, false, linePaint); // 三分線
+    // 2. 繪製籃板線
+    canvas.drawLine(Offset(size.width / 2 - 25, size.height * 0.12), Offset(size.width / 2 + 25, size.height * 0.12), linePaint);
 
+    // 3. 繪製禁區 (罰球區)
+    final keyRect = Rect.fromCenter(center: Offset(size.width / 2, size.height * 0.25), width: size.width * 0.3, height: size.height * 0.3);
+    canvas.drawRect(keyRect, linePaint);
+
+    // 4. 繪製三分線 (弧線) - 關鍵修正：確保半徑適中
+    final threePointRect = Rect.fromCircle(center: rimCenter, radius: size.width * 0.7);
+    canvas.drawArc(threePointRect, 0.2, 2.75, false, linePaint);
+
+    // 5. 繪製底線 (封閉球場)
+    canvas.drawLine(const Offset(0, 0), Offset(size.width, 0), linePaint);
+
+    // 繪製投籃點
     for (var r in records) {
-      final p = Paint()..color = r.isMade ? Colors.green.withOpacity(0.8) : Colors.red.withOpacity(0.8);
-      canvas.drawCircle(r.position, 10, p);
+      final p = Paint()..color = r.isMade ? Colors.green.withOpacity(0.7) : Colors.red.withOpacity(0.7);
+      canvas.drawCircle(r.position, 8, p);
       
-      // 顯示角度與類型
       TextPainter(
-        text: TextSpan(text: '${r.angle.toInt()}°\n${r.type}', style: const TextStyle(color: Colors.black87, fontSize: 9)),
+        text: TextSpan(text: '${r.angle.toInt()}°\n${r.type}', style: const TextStyle(color: Colors.black54, fontSize: 8)),
         textDirection: TextDirection.ltr,
-      )..layout()..paint(canvas, Offset(r.position.dx - 10, r.position.dy + 12));
+      )..layout()..paint(canvas, Offset(r.position.dx - 8, r.position.dy + 10));
     }
   }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
