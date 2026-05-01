@@ -10,8 +10,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          cache: true # 開啟快取加快速度
       - run: |
-          flutter config --enable-web
+          flutter pub get
           flutter build web --release --base-href /basket_trainer/
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3

@@ -101,7 +101,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF2D2D2D),
-        title: const Text('PRO ANALYTICS v1.0', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        title: const Text('BASKETBALL PRO v1.0', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -130,11 +130,11 @@ class _ShotProScreenState extends State<ShotProScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('FT: ', style: TextStyle(color: Colors.orangeAccent)),
-                Text('$_ftMade/$_ftTotal (${ftAcc.toStringAsFixed(0)}%)'),
-                const SizedBox(width: 10),
-                _ftBtn(Icons.add, () => setState(() => _ftTotal++)),
-                _ftBtn(Icons.check, () => setState(() { _ftTotal++; _ftMade++; })),
+                const Text('罰球: ', style: TextStyle(color: Colors.orangeAccent)),
+                Text('$_ftMade / $_ftTotal (${ftAcc.toStringAsFixed(0)}%)'),
+                const SizedBox(width: 5),
+                IconButton(icon: const Icon(Icons.add, size: 20), onPressed: () => setState(() => _ftTotal++)),
+                IconButton(icon: const Icon(Icons.check, size: 20), onPressed: () => setState(() { _ftTotal++; _ftMade++; })),
               ],
             ),
           ),
@@ -156,13 +156,13 @@ class _ShotProScreenState extends State<ShotProScreen> {
           ),
 
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _goalBtn(true, 'GOAL IN', Colors.green),
+                _goalBtn(true, 'IN', Colors.green),
                 const SizedBox(width: 20),
-                _goalBtn(false, 'MISSED', Colors.red),
+                _goalBtn(false, 'OUT', Colors.red),
               ],
             ),
           ),
@@ -205,10 +205,6 @@ class _ShotProScreenState extends State<ShotProScreen> {
     ]);
   }
 
-  Widget _ftBtn(IconData icon, VoidCallback onTap) {
-    return IconButton(icon: Icon(icon, size: 20), onPressed: onTap);
-  }
-
   Widget _goalBtn(bool goal, String txt, Color c) {
     bool active = _nextIsMade == goal;
     return ElevatedButton(
@@ -228,8 +224,11 @@ class FullCourtPainter extends CustomPainter {
     final linePaint = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 2.0;
     double mx = size.width / 2;
     double my = size.height / 2;
+
     canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), linePaint);
     canvas.drawCircle(Offset(mx, my), 40, linePaint);
+    
+    // 籃板籃圈
     canvas.drawLine(Offset(size.width * 0.04, my - 25), Offset(size.width * 0.04, my + 25), linePaint..strokeWidth = 3);
     canvas.drawCircle(Offset(size.width * 0.08, my), 8, Paint()..color = Colors.red..style = PaintingStyle.stroke..strokeWidth = 2);
 
@@ -239,9 +238,10 @@ class FullCourtPainter extends CustomPainter {
         canvas.drawCircle(r.position, 6, pPaint);
       } else {
         canvas.drawCircle(r.position, 6, pPaint..style = PaintingStyle.stroke..strokeWidth = 2);
-        canvas.drawLine(Offset(r.position.dx-4, r.position.dy-4), Offset(r.position.dx+4, r.position.dy+4), pPaint);
-        canvas.drawLine(Offset(r.position.dx+4, r.position.dy-4), Offset(r.position.dx-4, r.position.dy+4), pPaint);
+        canvas.drawLine(Offset(r.position.dx - 4, r.position.dy - 4), Offset(r.position.dx + 4, r.position.dy + 4), pPaint);
+        canvas.drawLine(Offset(r.position.dx + 4, r.position.dy - 4), Offset(r.position.dx - 4, r.position.dy + 4), pPaint);
       }
+
       final textSpan = TextSpan(
         text: '${r.type[0]}${r.angle.toInt()}°',
         style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold, backgroundColor: r.color.withOpacity(0.8)),
