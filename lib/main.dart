@@ -39,26 +39,18 @@ class ShotProScreen extends StatefulWidget {
   const ShotProScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const _ShotProScreenStateful();
-  }
+  State<ShotProScreen> createState() => _ShotProScreenState();
 }
 
-class _ShotProScreenStateful extends StatefulWidget {
-  const _ShotProScreenStateful();
-
-  @override
-  State<_ShotProScreenStateful> createState() => _ShotProScreenState();
-}
-
-class _ShotProScreenState extends State<_ShotProScreenStateful> {
+class _ShotProScreenState extends State<ShotProScreen> {
+  // 核心數據
   List<ShotRecord> shotRecords = [];
   bool nextShotIsMade = true;
   double currentAngle = 45.0;
   String currentType = '定點';
   int streak = 0;
 
-  /// 處理點擊紀錄
+  // 1. 處理點擊紀錄
   void handleTap(Offset localPosition) {
     setState(() {
       shotRecords.add(ShotRecord(
@@ -71,7 +63,7 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
     });
   }
 
-  /// 復原功能：刪除最後一筆紀錄
+  // 2. 復原功能 (Undo)
   void undoLastAction() {
     if (shotRecords.isNotEmpty) {
       setState(() {
@@ -81,7 +73,7 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
     }
   }
 
-  /// 重新計算連進次數
+  // 3. 重新計算連進次數 (Streak)
   void _recalculateStreak() {
     int currentStreak = 0;
     for (var i = shotRecords.length - 1; i >= 0; i--) {
@@ -94,6 +86,7 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
     streak = currentStreak;
   }
 
+  // 4. 重置功能
   void resetData() {
     setState(() {
       shotRecords.clear();
@@ -117,7 +110,6 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
         leading: IconButton(
           icon: const Icon(Icons.undo_rounded),
           onPressed: shotRecords.isEmpty ? null : undoLastAction,
-          tooltip: '復原上一步',
         ),
         actions: [
           IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: resetData),
@@ -125,19 +117,21 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
       ),
       body: Column(
         children: [
+          // 數據看板
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             color: Colors.orange[800],
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _stat('次數', total.toString(), Colors.white),
-                _stat('命中', made.toString(), Colors.greenAccent),
-                _stat('命中率', '${rate.toStringAsFixed(1)}%', Colors.yellowAccent),
-                _stat('連進', streak.toString(), Colors.white),
+                _buildStat('次數', total.toString(), Colors.white),
+                _buildStat('命中', made.toString(), Colors.greenAccent),
+                _buildStat('命中率', '${rate.toStringAsFixed(1)}%', Colors.yellowAccent),
+                _buildStat('連進', streak.toString(), Colors.white),
               ],
             ),
           ),
+          // 控制區
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Column(
@@ -148,9 +142,9 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
                     Text('${currentAngle.toInt()}°', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     Row(
                       children: [
-                        _toggle(true, '進球'),
+                        _toggleBtn(true, '進球'),
                         const SizedBox(width: 5),
-                        _toggle(false, '沒進'),
+                        _toggleBtn(false, '沒進'),
                       ],
                     ),
                   ],
@@ -177,6 +171,7 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
               ],
             ),
           ),
+          // 球場區
           Expanded(
             child: Container(
               margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
@@ -191,7 +186,7 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
                   onTapDown: (d) => handleTap(d.localPosition),
                   child: CustomPaint(
                     size: Size.infinite,
-                    painter: CompactCourtPainter(records: shotRecords),
+                    painter: FinalCourtPainter(records: shotRecords),
                   ),
                 ),
               ),
@@ -202,12 +197,12 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
     );
   }
 
-  Widget _stat(String l, String v, Color c) => Column(children: [
+  Widget _buildStat(String l, String v, Color c) => Column(children: [
     Text(l, style: const TextStyle(color: Colors.white70, fontSize: 11)),
     Text(v, style: TextStyle(color: c, fontSize: 16, fontWeight: FontWeight.bold))
   ]);
 
-  Widget _toggle(bool m, String l) {
+  Widget _toggleBtn(bool m, String l) {
     bool s = nextShotIsMade == m;
     return GestureDetector(
       onTap: () => setState(() => nextShotIsMade = m),
@@ -223,9 +218,9 @@ class _ShotProScreenState extends State<_ShotProScreenStateful> {
   }
 }
 
-class CompactCourtPainter extends CustomPainter {
+class FinalCourtPainter extends CustomPainter {
   final List<ShotRecord> records;
-  CompactCourtPainter({required this.records});
+  FinalCourtPainter({required this.records});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -236,7 +231,7 @@ class CompactCourtPainter extends CustomPainter {
     // 1. 底線
     canvas.drawLine(Offset(0, top), Offset(size.width, top), paint);
 
-    // 2. 禁區 (為了 iPad 分割畫面，將寬度大幅縮小至 30%)
+    // 2. 禁區 (針對 iPad 分割畫面優化：寬度 30%)
     double kw = size.width * 0.3;
     double kh = size.height * 0.3;
     canvas.drawRect(Rect.fromLTWH(cx - kw / 2, top, kw, kh), paint);
@@ -244,23 +239,22 @@ class CompactCourtPainter extends CustomPainter {
     // 3. 罰球弧
     canvas.drawArc(Rect.fromCenter(center: Offset(cx, top + kh), width: kw, height: kw), 0, 3.14, false, paint);
 
-    // 4. 籃框小圖示
+    // 4. 籃框
     canvas.drawCircle(Offset(cx, top + 15), 12, paint);
     canvas.drawLine(Offset(cx - 20, top + 5), Offset(cx + 20, top + 5), paint);
 
-    // 5. 三分線 (縮小半徑，確保在窄視窗也能看到弧線)
+    // 5. 三分線 (縮小半徑以適應窄長螢幕)
     double threeRadius = size.width * 0.38;
     canvas.drawArc(
       Rect.fromCircle(center: Offset(cx, top + 15), radius: threeRadius),
       0, 3.14, false, paint
     );
-    // 底角直線
     canvas.drawLine(Offset(cx - threeRadius, top), Offset(cx - threeRadius, top + 15), paint);
     canvas.drawLine(Offset(cx + threeRadius, top), Offset(cx + threeRadius, top + 15), paint);
 
-    // 6. 繪製紀錄點
+    // 6. 點位
     for (var r in records) {
-      final p = Paint()..color = r.isMade ? Colors.green.withOpacity(0.8) : Colors.red.withOpacity(0.8)..style = PaintingStyle.fill;
+      final p = Paint()..color = r.isMade ? Colors.green : Colors.red..style = PaintingStyle.fill;
       canvas.drawCircle(r.position, 8, p);
       canvas.drawCircle(r.position, 8, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1.5);
     }
