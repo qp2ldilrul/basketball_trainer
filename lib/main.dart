@@ -50,12 +50,12 @@ class ShotProScreen extends StatefulWidget {
 class _ShotProScreenState extends State<ShotProScreen> {
   final List<ShotRecord> _records = [];
   bool _nextIsMade = true;
-  double _currentAngle = 0.0;
   String _currentType = '定點';
   int _streak = 0;
   int _ftTotal = 0;
   int _ftMade = 0;
 
+  // 五種投籃方式高對比色
   final Map<String, Color> _typeColors = {
     '定點': Colors.cyanAccent,      
     '跳投': Colors.magentaAccent,   
@@ -65,19 +65,21 @@ class _ShotProScreenState extends State<ShotProScreen> {
   };
 
   void _handleTap(Offset pos, Size size) {
+    // 定位左側籃框中心
     double bx = size.width * 0.08;
     double by = size.height * 0.5;
+    
+    // 若點擊右半邊，則以右側籃框為基準計算角度
     double targetX = pos.dx > size.width / 2 ? size.width - bx : bx;
     double dx = pos.dx - targetX;
     double dy = pos.dy - by;
     double deg = (math.atan2(dy, dx) * 180 / math.pi).abs();
 
     setState(() {
-      _currentAngle = deg;
       _records.add(ShotRecord(
         position: pos,
         isMade: _nextIsMade,
-        angle: _currentAngle,
+        angle: deg,
         type: _currentType,
         color: _typeColors[_currentType]!,
       ));
@@ -116,6 +118,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
       ),
       body: Column(
         children: [
+          // 上方數據看板
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             color: const Color(0xFF252525),
@@ -129,63 +132,70 @@ class _ShotProScreenState extends State<ShotProScreen> {
             ),
           ),
           
-          // 罰球與類型選擇
+          // 罰球計算區
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('罰球: '),
-                ActionChip(label: Text('$_ftMade/$_ftTotal'), onPressed: () => setState(() => _ftTotal++)),
-                IconButton(icon: const Icon(Icons.check, color: Colors.green), onPressed: () => setState((){_ftTotal++; _ftMade++;})),
+                const Text('罰球: ', style: TextStyle(color: Colors.orangeAccent)),
+                Text('$_ftMade / $_ftTotal (${ftAcc.toStringAsFixed(1)}%)'),
+                const SizedBox(width: 10),
+                _ftBtn(Icons.add, () => setState(() => _ftTotal++)),
+                _ftBtn(Icons.check, () => setState(() { _ftTotal++; _ftMade++; })),
               ],
             ),
           ),
 
-          Wrap(
-            spacing: 8,
-            children: _typeColors.keys.map((type) => ChoiceChip(
-              label: Text(type),
-              selected: _currentType == type,
-              selectedColor: _typeColors[type],
-              onSelected: (s) => setState(() => _currentType = type),
-            )).toList(),
+          // 投籃類型選擇
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _typeColors.keys.map((type) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ChoiceChip(
+                  label: Text(type),
+                  selected: _currentType == type,
+                  selectedColor: _typeColors[type],
+                  labelStyle: TextStyle(color: _currentType == type ? Colors.black : Colors.white),
+                  onSelected: (s) => setState(() => _currentType = type),
+                ),
+              )).toList(),
+            ),
           ),
 
+          // 進球切換按鈕
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ElevatedButton(
-                  onPressed: () => setState(() => _nextIsMade = true),
-                  style: ElevatedButton.styleFrom(backgroundColor: _nextIsMade ? Colors.green : Colors.grey),
-                  child: const Text('IN'),
-                ),
+                _goalBtn(true, 'IN', Colors.green),
                 const SizedBox(width: 20),
-                ElevatedButton(
-                  onPressed: () => setState(() => _nextIsMade = false),
-                  style: ElevatedButton.styleFrom(backgroundColor: !_nextIsMade ? Colors.red : Colors.grey),
-                  child: const Text('OUT'),
-                ),
+                _goalBtn(false, 'OUT', Colors.red),
               ],
             ),
           ),
 
+          // 球場繪圖區
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
                 child: Container(
-                  color: const Color(0xFFF1C27D),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1C27D),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.brown, width: 2),
+                  ),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       return GestureDetector(
                         onTapDown: (d) => _handleTap(d.localPosition, Size(constraints.maxWidth, constraints.maxHeight)),
                         child: CustomPaint(
                           size: Size.infinite,
-                          painter: WebCourtPainter(records: _records),
+                          painter: FullCourtPainter(records: _records),
                         ),
                       );
                     },
@@ -205,43 +215,73 @@ class _ShotProScreenState extends State<ShotProScreen> {
       Text(val, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c)),
     ]);
   }
+
+  Widget _ftBtn(IconData icon, VoidCallback onTap) {
+    return IconButton(icon: Icon(icon, size: 20), onPressed: onTap);
+  }
+
+  Widget _goalBtn(bool goal, String txt, Color c) {
+    bool active = _nextIsMade == goal;
+    return ElevatedButton(
+      onPressed: () => setState(() => _nextIsMade = goal),
+      style: ElevatedButton.styleFrom(backgroundColor: active ? c : Colors.grey[800]),
+      child: Text(txt),
+    );
+  }
 }
 
-class WebCourtPainter extends CustomPainter {
+class FullCourtPainter extends CustomPainter {
   final List<ShotRecord> records;
-  WebCourtPainter({required this.records});
+  FullCourtPainter({required this.records});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 2.0;
+    final linePaint = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 2.0;
+    final boardPaint = Paint()..color = Colors.white..strokeWidth = 3.0;
+    final rimPaint = Paint()..color = Colors.red..style = PaintingStyle.stroke..strokeWidth = 2.0;
+    
     double mx = size.width / 2;
     double my = size.height / 2;
+
+    // 基本場地線
+    canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), linePaint);
+    canvas.drawCircle(Offset(mx, my), 40, linePaint);
     
-    // 繪製球場
-    canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), paint);
-    canvas.drawCircle(Offset(mx, my), 40, paint);
-    
-    // 籃框標記
-    canvas.drawCircle(Offset(size.width * 0.08, my), 10, paint..color = Colors.red);
-    canvas.drawCircle(Offset(size.width * 0.92, my), 10, paint);
+    // 左側籃板籃圈
+    canvas.drawLine(Offset(size.width * 0.04, my - 25), Offset(size.width * 0.04, my + 25), boardPaint);
+    canvas.drawCircle(Offset(size.width * 0.08, my), 8, rimPaint);
+
+    // 右側籃板籃圈
+    canvas.drawLine(Offset(size.width * 0.96, my - 25), Offset(size.width * 0.96, my + 25), boardPaint);
+    canvas.drawCircle(Offset(size.width * 0.92, my), 8, rimPaint);
 
     for (var r in records) {
       final pPaint = Paint()..color = r.color;
+      
+      // 繪製點位
       if (r.isMade) {
-        canvas.drawCircle(r.position, 6, pPaint);
+        canvas.drawCircle(r.position, 6, pPaint..style = PaintingStyle.fill);
       } else {
-        canvas.drawCircle(r.position, 6, pPaint..style = PaintingStyle.stroke);
+        canvas.drawCircle(r.position, 6, pPaint..style = PaintingStyle.stroke..strokeWidth = 2);
+        canvas.drawLine(Offset(r.position.dx - 4, r.position.dy - 4), Offset(r.position.dx + 4, r.position.dy + 4), pPaint);
+        canvas.drawLine(Offset(r.position.dx + 4, r.position.dy - 4), Offset(r.position.dx - 4, r.position.dy + 4), pPaint);
       }
 
+      // 繪製文字標籤 (類型 + 角度)
       final textSpan = TextSpan(
         text: '${r.type[0]}${r.angle.toInt()}°',
-        style: TextStyle(color: Colors.black, fontSize: 10, backgroundColor: r.color.withOpacity(0.7)),
+        style: TextStyle(
+          color: Colors.black, 
+          fontSize: 9, 
+          fontWeight: FontWeight.bold,
+          backgroundColor: r.color.withOpacity(0.8)
+        ),
       );
       final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
-      tp.paint(canvas, r.position + const Offset(8, -10));
+      tp.paint(canvas, r.position + const Offset(8, -12));
     }
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
