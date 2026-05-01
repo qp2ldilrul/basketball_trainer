@@ -57,7 +57,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
   int _ftTotal = 0;
   int _ftMade = 0;
 
-  // 五種高對比色
+  // 五種投籃方式對應顏色
   final Map<String, Color> _typeColors = {
     '定點': Colors.cyanAccent,      
     '跳投': Colors.magentaAccent,   
@@ -135,6 +135,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
       ),
       body: Column(
         children: [
+          // 數據統計列
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             color: const Color(0xFF252525),
@@ -149,6 +150,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
             ),
           ),
 
+          // 罰球控制項
           Padding(
             padding: const EdgeInsets.all(12),
             child: Container(
@@ -172,6 +174,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
             ),
           ),
 
+          // 投籃類型選擇
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
@@ -200,6 +203,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
             ),
           ),
 
+          // 球場畫布
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(15),
@@ -281,7 +285,7 @@ class WebCourtPainter extends CustomPainter {
     double my = size.height / 2;
     double bx = size.width * 0.08;
 
-    // 球場基本線
+    // 基本場地線條
     canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), linePaint);
     canvas.drawCircle(Offset(mx, my), size.height * 0.2, linePaint);
     
@@ -296,7 +300,7 @@ class WebCourtPainter extends CustomPainter {
     canvas.drawArc(Rect.fromCircle(center: Offset(bx, my), radius: tr), -1.3, 2.6, false, linePaint);
     canvas.drawArc(Rect.fromCircle(center: Offset(size.width - bx, my), radius: tr), 1.85, 2.6, false, linePaint);
 
-    // --- 籃板與籃圈繪製 (修正編譯相容性) ---
+    // --- 補上籃框與籃板 (純繪圖邏輯，確保相容) ---
     // 左側
     canvas.drawLine(Offset(size.width * 0.04, my - 25), Offset(size.width * 0.04, my + 25), boardPaint);
     canvas.drawCircle(Offset(bx, my), 8, rimPaint);
@@ -304,26 +308,20 @@ class WebCourtPainter extends CustomPainter {
     canvas.drawLine(Offset(size.width * 0.96, my - 25), Offset(size.width * 0.96, my + 25), boardPaint);
     canvas.drawCircle(Offset(size.width - bx, my), 8, rimPaint);
 
-    // 投籃點與文字
+    // 繪製投籃點 (改進渲染穩定性)
     for (var r in records) {
       final p = r.position;
-      final pColor = Paint()..color = r.color;
+      final pPaint = Paint()..color = r.color;
 
       if (r.isMade) {
-        canvas.drawCircle(p, 6, pColor);
+        // 進球：實心圓
+        canvas.drawCircle(p, 7, pPaint..style = PaintingStyle.fill);
       } else {
-        canvas.drawCircle(p, 6, pColor..style = PaintingStyle.stroke..strokeWidth = 2);
-        canvas.drawLine(Offset(p.dx-4, p.dy-4), Offset(p.dx+4, p.dy+4), pColor);
-        canvas.drawLine(Offset(p.dx+4, p.dy-4), Offset(p.dx-4, p.dy+4), pColor);
+        // 未進球：空心圓 + 叉叉
+        canvas.drawCircle(p, 7, pPaint..style = PaintingStyle.stroke..strokeWidth = 2);
+        canvas.drawLine(Offset(p.dx-4, p.dy-4), Offset(p.dx+4, p.dy+4), pPaint);
+        canvas.drawLine(Offset(p.dx+4, p.dy-4), Offset(p.dx-4, p.dy+4), pPaint);
       }
-
-      // 數據標籤
-      final textSpan = TextSpan(
-        text: '${r.type[0]}${r.angle.toInt()}°',
-        style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold, backgroundColor: r.color.withOpacity(0.9)),
-      );
-      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
-      tp.paint(canvas, Offset(p.dx + 8, p.dy - 12));
     }
   }
 
