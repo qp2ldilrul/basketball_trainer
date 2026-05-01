@@ -101,7 +101,7 @@ class _ShotProScreenState extends State<ShotProScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF2D2D2D),
-        title: const Text('BASKETBALL PRO v1.0', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        title: const Text('PRO COURT ANALYTICS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -130,11 +130,10 @@ class _ShotProScreenState extends State<ShotProScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('罰球: ', style: TextStyle(color: Colors.orangeAccent)),
+                const Text('罰球: ', style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
                 Text('$_ftMade / $_ftTotal (${ftAcc.toStringAsFixed(0)}%)'),
-                const SizedBox(width: 5),
-                IconButton(icon: const Icon(Icons.add, size: 20), onPressed: () => setState(() => _ftTotal++)),
-                IconButton(icon: const Icon(Icons.check, size: 20), onPressed: () => setState(() { _ftTotal++; _ftMade++; })),
+                IconButton(icon: const Icon(Icons.add_circle_outline, size: 20), onPressed: () => setState(() => _ftTotal++)),
+                IconButton(icon: const Icon(Icons.check_circle_outline, size: 20), onPressed: () => setState(() { _ftTotal++; _ftMade++; })),
               ],
             ),
           ),
@@ -156,13 +155,13 @@ class _ShotProScreenState extends State<ShotProScreen> {
           ),
 
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _goalBtn(true, 'IN', Colors.green),
+                _goalBtn(true, 'GOAL IN', Colors.green),
                 const SizedBox(width: 20),
-                _goalBtn(false, 'OUT', Colors.red),
+                _goalBtn(false, 'MISSED', Colors.red),
               ],
             ),
           ),
@@ -228,7 +227,6 @@ class FullCourtPainter extends CustomPainter {
     canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), linePaint);
     canvas.drawCircle(Offset(mx, my), 40, linePaint);
     
-    // 籃板籃圈
     canvas.drawLine(Offset(size.width * 0.04, my - 25), Offset(size.width * 0.04, my + 25), linePaint..strokeWidth = 3);
     canvas.drawCircle(Offset(size.width * 0.08, my), 8, Paint()..color = Colors.red..style = PaintingStyle.stroke..strokeWidth = 2);
 
@@ -238,8 +236,8 @@ class FullCourtPainter extends CustomPainter {
         canvas.drawCircle(r.position, 6, pPaint);
       } else {
         canvas.drawCircle(r.position, 6, pPaint..style = PaintingStyle.stroke..strokeWidth = 2);
-        canvas.drawLine(Offset(r.position.dx - 4, r.position.dy - 4), Offset(r.position.dx + 4, r.position.dy + 4), pPaint);
-        canvas.drawLine(Offset(r.position.dx + 4, r.position.dy - 4), Offset(r.position.dx - 4, r.position.dy + 4), pPaint);
+        canvas.drawLine(Offset(r.position.dx-4, r.position.dy-4), Offset(r.position.dx+4, r.position.dy+4), pPaint);
+        canvas.drawLine(Offset(r.position.dx+4, r.position.dy-4), Offset(r.position.dx-4, r.position.dy+4), pPaint);
       }
 
       final textSpan = TextSpan(

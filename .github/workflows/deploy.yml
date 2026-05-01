@@ -5,12 +5,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # 依照 GitHub 建議，強制開啟 Node 24 支援
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true # 開啟快取加快速度
+          cache: true
       - run: |
           flutter pub get
           flutter build web --release --base-href /basket_trainer/
