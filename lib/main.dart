@@ -81,6 +81,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
   };
 
   void _handleTap(Offset pos, Size size) {
+    // 根據點擊位置決定目標籃框（左或右）
     double targetX = pos.dx > size.width / 2 ? size.width * 0.92 : size.width * 0.08;
     double targetY = size.height / 2;
     double dx = pos.dx - targetX;
@@ -128,7 +129,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
 
     return Column(
       children: [
-        // 頂部導覽列：Undo 按鈕、標題、日期
+        // 頂部導覽
         Container(
           width: double.infinity,
           padding: const EdgeInsets.only(top: 10),
@@ -140,7 +141,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
                 children: [
                   IconButton(icon: const Icon(Icons.undo, color: Colors.white), onPressed: _undo),
                   const Text('BASKETBALL TRAINER PRO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const SizedBox(width: 48), // 保持標題置中
+                  const SizedBox(width: 48),
                 ],
               ),
               Text(today, style: const TextStyle(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w500)),
@@ -148,7 +149,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
-        // 數據統計區塊
+        // 統計數據
         Container(
           padding: const EdgeInsets.symmetric(vertical: 15),
           color: const Color(0xFF252525),
@@ -162,7 +163,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
-        // 罰球與重設按鈕
+        // 罰球與重置按鈕
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
           child: Row(
@@ -180,30 +181,37 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ],
           ),
         ),
-        // 投籃類型選擇 (ChoiceChips)
+        // 投籃類型選擇：修正擠在一起的問題
         const SizedBox(height: 5),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: _typeColors.keys.map((type) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ChoiceChip(
-              label: Text(type),
-              selected: _currentType == type,
-              selectedColor: _typeColors[type],
-              labelStyle: TextStyle(color: _currentType == type ? Colors.black : Colors.white, fontWeight: FontWeight.bold),
-              onSelected: (val) => setState(() => _currentType = type),
-            ),
-          )).toList(),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: _typeColors.keys.map((type) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: ChoiceChip(
+                visualDensity: const VisualDensity(horizontal: 2, vertical: -1), // 增加內部水平空間
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // 增加外距
+                label: Text(type, style: const TextStyle(fontSize: 16)),
+                selected: _currentType == type,
+                selectedColor: _typeColors[type],
+                labelStyle: TextStyle(
+                  color: _currentType == type ? Colors.black : Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                onSelected: (val) => setState(() => _currentType = type),
+              ),
+            )).toList(),
+          ),
         ),
-        // 鮮黃色提示區塊：顯示最後一次角度
+        // 最後角度黃色提示
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.yellowAccent,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4)],
             ),
             child: Text(
               '最後投籃角度: ${_lastAngle.toStringAsFixed(1)}°',
@@ -211,7 +219,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             ),
           ),
         ),
-        // IN / OUT 切換按鈕
+        // IN / OUT 按鈕
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -220,7 +228,7 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
             _goalBtn(false, 'OUT', Colors.grey.shade700),
           ],
         ),
-        // 籃球場繪圖區域 (包含每個點的角度)
+        // 球場繪圖：包含點點旁的角度
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -231,7 +239,6 @@ class _ShotTrackerBodyState extends State<ShotTrackerBody> {
                   color: const Color(0xFFF1C27D),
                   borderRadius: BorderRadius.circular(15),
                   border: Border.all(color: Colors.orange.shade900, width: 4),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10)],
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -291,21 +298,17 @@ class FullCourtPainter extends CustomPainter {
     double midX = w / 2;
     double midY = h / 2;
 
-    // --- 球場線條繪製 ---
+    // 球場線條
     canvas.drawLine(Offset(midX, 0), Offset(midX, h), linePaint);
     canvas.drawCircle(Offset(midX, midY), h * 0.18, linePaint);
 
     for (bool isLeft in [true, false]) {
       double sideMul = isLeft ? 1 : -1;
       double startX = isLeft ? 0 : w;
-
-      // 禁區
       double keyW = w * 0.18;
       double keyH = h * 0.38;
       canvas.drawRect(Rect.fromCenter(center: Offset(startX + (sideMul * keyW / 2), midY), width: keyW, height: keyH), linePaint);
       canvas.drawArc(Rect.fromCenter(center: Offset(startX + (sideMul * keyW), midY), width: keyH, height: keyH), isLeft ? -math.pi / 2 : math.pi / 2, math.pi, false, linePaint);
-
-      // 三分線
       double threeR = h * 0.42;
       double straightW = w * 0.05;
       canvas.drawLine(Offset(startX, midY - threeR), Offset(startX + (sideMul * straightW), midY - threeR), linePaint);
@@ -313,17 +316,14 @@ class FullCourtPainter extends CustomPainter {
       canvas.drawArc(Rect.fromCenter(center: Offset(startX + (sideMul * straightW), midY), width: (w * 0.3) * 2, height: threeR * 2), isLeft ? -math.pi / 2 : math.pi / 2, math.pi, false, linePaint);
     }
 
-    // 左右兩側中線位置的實心大黑點
     canvas.drawCircle(Offset(w * 0.08, midY), 14, dotPaint);
     canvas.drawCircle(Offset(w * 0.92, midY), 14, dotPaint);
 
-    // --- 繪製投籃位置與角度標記 ---
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-
+    // 繪製每個點位與對應的角度文字
     for (var r in records) {
       final pPaint = Paint()..color = r.color..strokeCap = StrokeCap.round;
       
-      // 繪製點 (命中為實心，沒進為空心 X)
+      // 1. 畫投籃點
       if (r.isMade) {
         canvas.drawCircle(r.position, 9, pPaint);
       } else {
@@ -332,17 +332,21 @@ class FullCourtPainter extends CustomPainter {
         canvas.drawLine(Offset(r.position.dx+6, r.position.dy-6), Offset(r.position.dx-6, r.position.dy+6), pPaint);
       }
 
-      // 繪製點位旁的角度文字
-      textPainter.text = TextSpan(
-        text: '${r.angle.toStringAsFixed(1)}°',
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          backgroundColor: Colors.white.withOpacity(0.7),
+      // 2. 畫角度文字標籤 (確保在點的旁邊)
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: '${r.angle.toStringAsFixed(1)}°',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            backgroundColor: Colors.white.withOpacity(0.8),
+          ),
         ),
+        textDirection: TextDirection.ltr,
       );
       textPainter.layout();
+      // 將文字偏移，避免蓋住點點
       textPainter.paint(canvas, Offset(r.position.dx - (textPainter.width / 2), r.position.dy - 22));
     }
   }
