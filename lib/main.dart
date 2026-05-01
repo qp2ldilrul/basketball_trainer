@@ -273,15 +273,15 @@ class WebCourtPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()..color = Colors.white.withOpacity(0.8)..style = PaintingStyle.stroke..strokeWidth = 2.0;
-    final rimPaint = Paint()..color = Colors.redAccent..style = PaintingStyle.stroke..strokeWidth = 3.0;
+    final rimPaint = Paint()..color = Colors.redAccent..style = PaintingStyle.stroke..strokeWidth = 2.5;
     final boardPaint = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 3.0;
     final paintArea = Paint()..color = const Color(0xFFE67E22)..style = PaintingStyle.fill;
     
     double mx = size.width / 2;
     double my = size.height / 2;
-    double bx = size.width * 0.08; // 籃框位置
+    double bx = size.width * 0.08;
 
-    // 球場基本線條
+    // 球場基本線
     canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), linePaint);
     canvas.drawCircle(Offset(mx, my), size.height * 0.2, linePaint);
     
@@ -296,44 +296,34 @@ class WebCourtPainter extends CustomPainter {
     canvas.drawArc(Rect.fromCircle(center: Offset(bx, my), radius: tr), -1.3, 2.6, false, linePaint);
     canvas.drawArc(Rect.fromCircle(center: Offset(size.width - bx, my), radius: tr), 1.85, 2.6, false, linePaint);
 
-    // --- 補上籃框與籃板 ---
-    // 左側籃框與籃板
-    canvas.drawLine(Offset(size.width * 0.04, my - 30), Offset(size.width * 0.04, my + 30), boardPaint); // 籃板
-    canvas.drawCircle(Offset(bx, my), 10, rimPaint); // 籃圈
-    
-    // 右側籃框與籃板
-    canvas.drawLine(Offset(size.width * 0.96, my - 30), Offset(size.width * 0.96, my + 30), boardPaint); // 籃板
-    canvas.drawCircle(Offset(size.width - bx, my), 10, rimPaint); // 籃圈
+    // --- 籃板與籃圈繪製 (修正編譯相容性) ---
+    // 左側
+    canvas.drawLine(Offset(size.width * 0.04, my - 25), Offset(size.width * 0.04, my + 25), boardPaint);
+    canvas.drawCircle(Offset(bx, my), 8, rimPaint);
+    // 右側
+    canvas.drawLine(Offset(size.width * 0.96, my - 25), Offset(size.width * 0.96, my + 25), boardPaint);
+    canvas.drawCircle(Offset(size.width - bx, my), 8, rimPaint);
 
-    // 繪製投籃點與文字
+    // 投籃點與文字
     for (var r in records) {
       final p = r.position;
-      final paint = Paint()..color = r.color;
+      final pColor = Paint()..color = r.color;
 
       if (r.isMade) {
-        canvas.drawCircle(p, 6, paint);
+        canvas.drawCircle(p, 6, pColor);
       } else {
-        canvas.drawCircle(p, 6, paint..style = PaintingStyle.stroke..strokeWidth = 2);
-        canvas.drawLine(Offset(p.dx-4, p.dy-4), Offset(p.dx+4, p.dy+4), paint);
-        canvas.drawLine(Offset(p.dx+4, p.dy-4), Offset(p.dx-4, p.dy+4), paint);
+        canvas.drawCircle(p, 6, pColor..style = PaintingStyle.stroke..strokeWidth = 2);
+        canvas.drawLine(Offset(p.dx-4, p.dy-4), Offset(p.dx+4, p.dy+4), pColor);
+        canvas.drawLine(Offset(p.dx+4, p.dy-4), Offset(p.dx-4, p.dy+4), pColor);
       }
 
-      // 繪製標籤 (類型+角度)
+      // 數據標籤
       final textSpan = TextSpan(
         text: '${r.type[0]}${r.angle.toInt()}°',
-        style: TextStyle(
-          color: Colors.black, 
-          fontSize: 10, 
-          fontWeight: FontWeight.bold, 
-          backgroundColor: r.color.withOpacity(0.85)
-        ),
+        style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold, backgroundColor: r.color.withOpacity(0.9)),
       );
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
-      
-      textPainter.paint(canvas, Offset(p.dx + 8, p.dy - 12));
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+      tp.paint(canvas, Offset(p.dx + 8, p.dy - 12));
     }
   }
 
