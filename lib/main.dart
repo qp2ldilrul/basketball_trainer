@@ -57,7 +57,8 @@ class _ShotProScreenState extends State<ShotProScreen> {
 }
 
 class ShotTrackerBody extends StatefulWidget {
-  const ShotTrackerBody({super.head});
+  // 這裡已修正：使用正確的 super.key
+  const ShotTrackerBody({super.key});
 
   @override
   State<ShotTrackerBody> createState() => _ShotTrackerBodyState();
