@@ -1,212 +1,204 @@
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const BasketballTrainerApp());
-}
+void main() => runApp(const BasketballProApp());
 
-class BasketballTrainerApp extends StatelessWidget {
-  const BasketballTrainerApp({super.key});
-
+class BasketballProApp extends StatelessWidget {
+  const BasketballProApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.orange),
-      home: const ShotMapScreen(),
+      theme: ThemeData(primarySwatch: Colors.orange, useMaterial3: true),
+      home: const ShotProScreen(),
     );
   }
 }
 
-// 增加 angle 欄位紀錄角度
 class ShotRecord {
   final Offset position;
   final bool isMade;
-  final double angle; 
-  ShotRecord({required this.position, required this.isMade, required this.angle});
+  final double angle;
+  final String type; // 投籃類型
+  ShotRecord({required this.position, required this.isMade, required this.angle, required this.type});
 }
 
-class ShotMapScreen extends StatefulWidget {
-  const ShotMapScreen({super.key});
-
+class ShotProScreen extends StatefulWidget {
+  const ShotProScreen({super.key});
   @override
-  State<ShotMapScreen> createState() => _ShotMapScreenState();
+  State<ShotProScreen> createState() => _ShotProScreenState();
 }
 
-class _ShotMapScreenState extends State<ShotMapScreen> {
+class _ShotProScreenState extends State<ShotProScreen> {
   List<ShotRecord> shotRecords = [];
   bool nextShotIsMade = true;
-  double currentAngle = 45.0; // 預設投籃角度為 45 度
+  double currentAngle = 45.0;
+  String currentType = '定點'; // 預設投籃類型
+  int streak = 0; // 連進紀錄
+  int maxStreak = 0;
 
-  int get totalShots => shotRecords.length;
-  int get madeShots => shotRecords.where((r) => r.isMade).length;
-  double get madeRate => totalShots > 0 ? (madeShots / totalShots) * 100 : 0.0;
+  void handleTap(Offset pos) {
+    setState(() {
+      shotRecords.add(ShotRecord(
+        position: pos,
+        isMade: nextShotIsMade,
+        angle: currentAngle,
+        type: currentType,
+      ));
+      
+      if (nextShotIsMade) {
+        streak++;
+        if (streak > maxStreak) maxStreak = streak;
+      } else {
+        streak = 0;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    double rate = shotRecords.isEmpty ? 0 : (shotRecords.where((r)=>r.isMade).length / shotRecords.length) * 100;
+
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('大兒子投籃位置與角度分析'),
+        title: const Text('大兒子籃球科學分析'),
         backgroundColor: Colors.orange[400],
         actions: [
-          IconButton(icon: const Icon(Icons.delete_sweep), onPressed: () => setState(() => shotRecords.clear())),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => setState(() { shotRecords.clear(); streak=0; }))
         ],
       ),
       body: Column(
         children: [
-          // 數據看板
+          // 1. 遊戲化數據看板 [優化1]
           Container(
             padding: const EdgeInsets.all(10),
             child: Card(
               elevation: 4,
+              color: Colors.orange[50],
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: Column(
                   children: [
-                    _buildStat('總投籃', totalShots.toString()),
-                    _buildStat('命中', madeShots.toString()),
-                    _buildStat('命中率', '${madeRate.toStringAsFixed(1)}%'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStat('命中率', '${rate.toStringAsFixed(1)}%', isHighlight: rate >= 50),
+                        _buildStat('連進', streak.toString(), isHighlight: streak > 0),
+                        _buildStat('最高連進', maxStreak.toString()),
+                      ],
+                    ),
+                    if (rate >= 50 && shotRecords.length >= 5) 
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text('🔥 進入神射手狀態！', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      ),
                   ],
                 ),
               ),
             ),
           ),
-          
-          // 角度滑桿區域
+
+          // 2. 角度與模式控制 [優化2]
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('目前設定角度: ${currentAngle.toInt()}°', 
-                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange)),
-                    Row(
-                      children: [
-                        ChoiceChip(
-                          label: const Text('進球'),
-                          selected: nextShotIsMade,
-                          onSelected: (val) => setState(() => nextShotIsMade = true),
-                          selectedColor: Colors.green[200],
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('沒進'),
-                          selected: !nextShotIsMade,
-                          onSelected: (val) => setState(() => nextShotIsMade = false),
-                          selectedColor: Colors.red[200],
-                        ),
-                      ],
+                    Text('角度: ${currentAngle.toInt()}°', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: Slider(
+                        value: currentAngle, min: 0, max: 90, divisions: 90,
+                        onChanged: (v) => setState(() => currentAngle = v),
+                      ),
                     ),
+                    Switch(value: nextShotIsMade, activeColor: Colors.green, onChanged: (v) => setState(() => nextShotIsMade = v)),
+                    Text(nextShotIsMade ? '進球' : '未進'),
                   ],
                 ),
-                Slider(
-                  value: currentAngle,
-                  min: 0,
-                  max: 90,
-                  divisions: 90,
-                  label: '${currentAngle.toInt()}°',
-                  onChanged: (double value) {
-                    setState(() {
-                      currentAngle = value;
-                    });
-                  },
+                // 3. 投籃類型標籤 [優化4]
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ['定點', '運球', '跳投', '上籃'].map((t) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(t),
+                        selected: currentType == t,
+                        onSelected: (s) => setState(() => currentType = t),
+                      ),
+                    )).toList(),
+                  ),
                 ),
               ],
             ),
           ),
 
-          // 繪製半圓球場
+          // 4. 放大版球場 [優化：場地變大]
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(10),
+            child: Container(
+              margin: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.orange[200]!, width: 2),
+              ),
               child: GestureDetector(
-                onTapDown: (details) {
-                  setState(() {
-                    shotRecords.add(ShotRecord(
-                      position: details.localPosition, 
-                      isMade: nextShotIsMade,
-                      angle: currentAngle,
-                    ));
-                  });
-                },
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                onTapDown: (d) => handleTap(d.localPosition),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
                   child: CustomPaint(
-                    painter: CourtPainter(shotRecords: shotRecords),
+                    size: Size.infinite,
+                    painter: CourtPainter(records: shotRecords),
                   ),
                 ),
               ),
             ),
           ),
           const Padding(
-            padding: EdgeInsets.only(bottom: 10),
-            child: Text('提示：先調整上方角度，再點擊球場位置記錄', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            padding: EdgeInsets.only(bottom: 5),
+            child: Text('點擊球場紀錄位置', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStat(String label, String value) {
+  Widget _buildStat(String label, String value, {bool isHighlight = false}) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isHighlight ? Colors.red : Colors.orange[800])),
       ],
     );
   }
 }
 
 class CourtPainter extends CustomPainter {
-  final List<ShotRecord> shotRecords;
-  CourtPainter({required this.shotRecords});
+  final List<ShotRecord> records;
+  CourtPainter({required this.records});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black12
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+    final linePaint = Paint()..color = Colors.orange[200]!..style = PaintingStyle.stroke..strokeWidth = 3;
+    final center = Offset(size.width / 2, 60);
 
-    // 畫籃框
-    canvas.drawCircle(Offset(size.width / 2, 50), 12, paint);
-    // 畫三分線
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(size.width / 2, 50), radius: size.width * 0.7),
-      0,
-      3.14,
-      false,
-      paint,
-    );
-    // 畫禁區
-    canvas.drawRect(Rect.fromCenter(center: Offset(size.width/2, 100), width: 100, height: 100), paint);
+    // 繪製加大版球場線條
+    canvas.drawCircle(center, 15, linePaint); // 籃框
+    canvas.drawRect(Rect.fromCenter(center: Offset(size.width / 2, 100), width: 120, height: 140), linePaint); // 禁區
+    canvas.drawArc(Rect.fromCircle(center: center, radius: size.width * 0.8), 0, 3.14, false, linePaint); // 三分線
 
-    // 繪製投籃點（包含角度資訊）
-    for (var record in shotRecords) {
-      final shotPaint = Paint()
-        ..color = record.isMade ? Colors.green.withOpacity(0.7) : Colors.red.withOpacity(0.7)
-        ..style = PaintingStyle.fill;
+    for (var r in records) {
+      final p = Paint()..color = r.isMade ? Colors.green.withOpacity(0.8) : Colors.red.withOpacity(0.8);
+      canvas.drawCircle(r.position, 10, p);
       
-      canvas.drawCircle(record.position, 8, shotPaint);
-      
-      // 在點點下方顯示角度小文字
+      // 顯示角度與類型
       TextPainter(
-        text: TextSpan(
-          text: '${record.angle.toInt()}°',
-          style: const TextStyle(color: Colors.black54, fontSize: 10),
-        ),
+        text: TextSpan(text: '${r.angle.toInt()}°\n${r.type}', style: const TextStyle(color: Colors.black87, fontSize: 9)),
         textDirection: TextDirection.ltr,
-      )..layout()..paint(canvas, Offset(record.position.dx - 10, record.position.dy + 8));
+      )..layout()..paint(canvas, Offset(r.position.dx - 10, r.position.dy + 12));
     }
   }
-
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
