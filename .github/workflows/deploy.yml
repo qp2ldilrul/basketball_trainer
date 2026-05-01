@@ -14,7 +14,7 @@ jobs:
           channel: 'stable'
       - run: |
           flutter pub get
-          flutter build web --release --base-href /basket_trainer/
+          - run: flutter build web --release --base-href /basketball_trainer/
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
